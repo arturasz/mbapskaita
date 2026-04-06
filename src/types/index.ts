@@ -116,6 +116,8 @@ export interface WithdrawalPlan {
   civilContractEnabled: boolean; // civilinė sutartis
   civilContractAnnual: number; // annual civil contract amount
   dividendsEnabled: boolean; // pelno išėmimas / dividendai
+  withdrawAll: boolean; // true = withdraw all profit, false = use withdrawalTarget
+  withdrawalTarget: number; // how much to withdraw (rest stays in MB for investments)
 }
 
 // --- App state ---

@@ -28,6 +28,8 @@ export function CalculatorPage() {
   const [civilContractEnabled, setCivilContractEnabled] = useState(false);
   const [civilContractAnnual, setCivilContractAnnual] = useState("");
   const [dividendsEnabled, setDividendsEnabled] = useState(true);
+  const [withdrawAll, setWithdrawAll] = useState(true);
+  const [withdrawalTarget, setWithdrawalTarget] = useState("");
 
   // Update salary default when year changes
   const handleYearChange = (newYear: number) => {
@@ -79,6 +81,8 @@ export function CalculatorPage() {
       civilContractEnabled,
       civilContractAnnual: civilContractEnabled ? Number(civilContractAnnual) || 0 : 0,
       dividendsEnabled,
+      withdrawAll,
+      withdrawalTarget: Number(withdrawalTarget) || 0,
     };
 
     return calculateOptimizedTax(fakeIncome, fakeExpense, year, plan);
@@ -91,6 +95,8 @@ export function CalculatorPage() {
     civilContractEnabled,
     civilContractAnnual,
     dividendsEnabled,
+    withdrawAll,
+    withdrawalTarget,
   ]);
 
   return (
@@ -136,6 +142,45 @@ export function CalculatorPage() {
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </label>
+        </div>
+      </Card>
+
+      {/* How much to withdraw */}
+      <Card title="Kiek issiimti">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              checked={withdrawAll}
+              onChange={() => setWithdrawAll(true)}
+              className="border-gray-300"
+            />
+            <span className="text-sm text-gray-700">Visą pelną</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              checked={!withdrawAll}
+              onChange={() => setWithdrawAll(false)}
+              className="border-gray-300"
+            />
+            <span className="text-sm text-gray-700">Konkrečią sumą (likutis lieka MB — investicijoms, rezervui)</span>
+          </label>
+          {!withdrawAll && (
+            <input
+              type="number"
+              step="1000"
+              value={withdrawalTarget}
+              onChange={(e) => setWithdrawalTarget(e.target.value)}
+              placeholder="pvz. 30000"
+              className="ml-6 block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          )}
+          {!withdrawAll && result && result.remainingInMB > 0 && (
+            <p className="ml-6 text-sm text-gray-500">
+              MB liks: {fmt(result.remainingInMB)} (neapmokestinama kol neišimta)
+            </p>
+          )}
         </div>
       </Card>
 

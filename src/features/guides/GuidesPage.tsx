@@ -118,6 +118,83 @@ Jei pajamos mažos, vis tiek reikia mokėti minimaliąsias Sodra įmokas nuo MMA
 
 Kas mėnesį iki 15 d. pateikiamas **SAV pranešimas** per Sodra portalą.`,
   },
+  {
+    id: "withdrawal-methods",
+    title: "Pinigų išėmimo būdai",
+    content: `## Pinigų išėmimo iš MB būdai
+
+MB narys gali išsiimti pinigus trimis būdais. Galima derinti kelis.
+
+### 1. Darbo sutartis (alga)
+
+- **GPM**: 20% (aukštesnis nei kiti būdai)
+- **Sodra**: VSD 12.52% + PSD 6.98% (darbuotojo) + ~1.77% (darbdavio)
+- **Stažas**: taip, pilnas
+- **Mokėjimas**: kas mėnesį, ne rečiau
+- **Minimali alga**: MMA (2026 m. — 1 088 EUR/mėn.)
+
+**Kas mėnesį reikia:**
+1. Išmokėti algą darbuotojui (sau)
+2. Sumokėti Sodra įmokas (iki 15 d.)
+3. Pervesti GPM į VMI (iki 15 d.)
+4. Pateikti SAV pranešimą Sodrai (iki 15 d.)
+5. Pateikti FR0572 (GPM deklaraciją) VMI (iki 15 d.)
+
+**Svarbu:** negalima mokėti kartą per metus. Alga turi būti reguliari — kas mėnesį.
+
+### 2. Civilinė sutartis
+
+- **GPM**: 15%
+- **Sodra**: VSD 12.52% + PSD 6.98%
+- **Stažas**: taip
+- **Mokėjimas**: pagal sutarties sąlygas (gali būti kas ketvirtį ar rečiau)
+- **PVM riba**: jei metinė suma > 45 000 EUR — privaloma PVM registracija
+
+**Privalumai prieš darbo sutartį:**
+- Mažesnis GPM (15% vs 20%)
+- Lankstesnis mokėjimo grafikas
+- Nėra darbdavio Sodros dalies
+- Paprastesnis administravimas
+
+**Kas reikia:**
+1. Sudaryti civilinę sutartį tarp MB ir nario
+2. Mokėti pagal sutarties grafiką
+3. Sodra — kas mėnesį iki 15 d.
+4. SAV pranešimas — kas mėnesį
+
+### 3. Pelno išėmimas (dividendai)
+
+- **GPM**: 15%
+- **Sodra**: tik privaloma PSD nuo MMA (jei nėra kitų Sodra šaltinių)
+- **Stažas**: ne (nebent mokate savanorišką VSD)
+- **Mokėjimas**: bet kada, bet kokia suma
+
+**Privalumai:**
+- Mažiausi mokesčiai
+- Jokių mėnesinių įsipareigojimų
+- Galima imti kai reikia
+
+**Trūkumai:**
+- Nekaupia stažo
+- MB turi turėti pelną (pajamos > išlaidos)
+
+### Rekomenduojama strategija
+
+**Optimalus derinys stažui + žemiems mokesčiams:**
+1. Civilinė sutartis nuo MMA bazės (stažui kaupti) — ~13 000 EUR/metus
+2. Likutį — pelno išėmimas (tik GPM 15%)
+
+Tai duoda pilną stažą ir žemiausią efektyvų mokesčio tarifą.
+
+### Pinigai MB viduje
+
+Neišimti pinigai **neapmokestinami**. MB gali:
+- Investuoti (vertybiniai popieriai, indėliai)
+- Kaupti rezervą
+- Pirkti turtą verslo reikmėms
+
+GPM mokamas tik kai pinigai faktiškai išimami nariui.`,
+  },
 ];
 
 export function GuidesPage() {

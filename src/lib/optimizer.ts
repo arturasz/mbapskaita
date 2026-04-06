@@ -41,8 +41,13 @@ export function calculateOptimizedTax(
 
   const mbProfit = Math.max(0, totalIncome - totalExpenses);
 
+  // How much the member wants to withdraw (rest stays in MB for investments etc.)
+  const targetWithdrawal = plan.withdrawAll
+    ? mbProfit
+    : Math.min(plan.withdrawalTarget, mbProfit);
+
   const withdrawals: WithdrawalBreakdown[] = [];
-  let remaining = mbProfit;
+  let remaining = targetWithdrawal;
   let hasSodraStazas = false; // track if any method provides stažas
 
   // 1. Salary (darbo sutartis)
@@ -166,7 +171,7 @@ export function calculateOptimizedTax(
     effectiveRate: mbProfit > 0 ? r2(totalTax / mbProfit) : 0,
     stazasMonths,
     vatWarning: civilContractTotal > rates.vatThreshold,
-    remainingInMB: r2(remaining),
+    remainingInMB: r2(mbProfit - targetWithdrawal + remaining),
   };
 }
 

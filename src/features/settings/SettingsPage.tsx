@@ -208,6 +208,39 @@ export function SettingsPage() {
               </div>
             </label>
           </div>
+
+          {/* Withdrawal target */}
+          <div className="border-t pt-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!plan.withdrawAll}
+                onChange={(e) => handlePlanChange({ withdrawAll: !e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Palikti dalį pelno MB</span>
+                <p className="text-xs text-gray-500">Neišimti pinigai neapmokestinami — gali būti investuojami MB vardu</p>
+              </div>
+            </label>
+            {!plan.withdrawAll && (
+              <label className="ml-9 mt-2 block">
+                <span className="text-sm text-gray-600">Planuojama išsiimti per metus</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={plan.withdrawalTarget || ""}
+                    onChange={(e) => handlePlanChange({ withdrawalTarget: Number(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <span className="text-sm text-gray-500">EUR/metus</span>
+                </div>
+              </label>
+            )}
+          </div>
         </div>
       </Card>
 

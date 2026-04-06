@@ -17,6 +17,8 @@ const defaultSettings: Settings = {
     civilContractEnabled: true,
     civilContractAnnual: 0,
     dividendsEnabled: true,
+    withdrawAll: true,
+    withdrawalTarget: 0,
   },
 };
 
