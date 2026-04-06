@@ -232,7 +232,7 @@ export function CalculatorPage() {
             <p className="mt-1 ml-6 text-xs text-gray-500">
               GPM 15%, VSD 13.83% + PSD 6.98% nuo bazės. Stažo kaupimas.
             </p>
-            {memberWithdrawalEnabled && (
+            {memberWithdrawalEnabled && rates && (
               <label className="mt-3 block">
                 <span className="text-sm text-gray-600">Metinė suma (EUR)</span>
                 <input
@@ -244,7 +244,7 @@ export function CalculatorPage() {
                   className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
                 <span className="mt-1 block text-xs text-gray-500">
-                  0 arba tuščia = išsiimti visą pelną po pelno mokesčio
+                  0 arba tuščia = visas likutis. Min. pilnam stažui: {fmt(Math.ceil(rates.minMonthlyWage / rates.sodraMemberBasePercent * 12))}
                 </span>
               </label>
             )}
