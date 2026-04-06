@@ -15,7 +15,8 @@ const defaultSettings: Settings = {
   withdrawalPlan: {
     civilContractEnabled: false,
     civilContractAnnual: 0,
-    memberWithdrawalEnabled: true, // lėšos asmeniniams poreikiams (code 02)
+    memberWithdrawalEnabled: true,
+    memberWithdrawalAnnual: 0, // 0 = visas likutis
     withdrawAll: true,
     withdrawalTarget: 0,
   },

@@ -150,6 +150,7 @@ export interface WithdrawalPlan {
   civilContractEnabled: boolean;
   civilContractAnnual: number;
   memberWithdrawalEnabled: boolean; // lėšos asmeniniams poreikiams (code 02)
+  memberWithdrawalAnnual: number; // 0 = visas likutis po pelno mokesčio
   withdrawAll: boolean;
   withdrawalTarget: number;
 }

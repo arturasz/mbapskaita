@@ -150,6 +150,24 @@ export function SettingsPage() {
                 <p className="text-xs text-gray-500">GPM 15%, VSD 13.83% + PSD 6.98%. Stažo kaupimas. Iš pelno po pelno mokesčio.</p>
               </div>
             </label>
+            {plan.memberWithdrawalEnabled && (
+              <label className="ml-9 block">
+                <span className="text-sm text-gray-600">Metinė suma</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={plan.memberWithdrawalAnnual || ""}
+                    onChange={(e) => handlePlanChange({ memberWithdrawalAnnual: Number(e.target.value) || 0 })}
+                    placeholder="0 = visas likutis"
+                    className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <span className="text-sm text-gray-500">EUR/metus</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">0 = išsiimti visą pelną po pelno mokesčio</p>
+              </label>
+            )}
           </div>
 
           {/* Civil contract (civilinė sutartis) */}

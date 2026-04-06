@@ -37,6 +37,7 @@ export function CalculatorPage() {
     if (planned > 0 && income === "") setIncome(String(planned * 12));
     setYear(settings.fiscalYear);
     setMemberWithdrawalEnabled(plan.memberWithdrawalEnabled);
+    if (plan.memberWithdrawalAnnual > 0) setMemberWithdrawalAnnual(String(plan.memberWithdrawalAnnual));
     setCivilContractEnabled(plan.civilContractEnabled);
     if (plan.civilContractAnnual > 0) setCivilContractAnnual(String(plan.civilContractAnnual));
     setWithdrawAll(plan.withdrawAll);
@@ -48,6 +49,7 @@ export function CalculatorPage() {
   const [activityStartDate, setActivityStartDate] = useState(settings.activityStartDate ?? "");
 
   const [memberWithdrawalEnabled, setMemberWithdrawalEnabled] = useState(plan.memberWithdrawalEnabled);
+  const [memberWithdrawalAnnual, setMemberWithdrawalAnnual] = useState("");
   const [civilContractEnabled, setCivilContractEnabled] = useState(plan.civilContractEnabled);
   const [civilContractAnnual, setCivilContractAnnual] = useState("");
   const [withdrawAll, setWithdrawAll] = useState(true);
@@ -90,6 +92,7 @@ export function CalculatorPage() {
 
     const plan: WithdrawalPlan = {
       memberWithdrawalEnabled,
+      memberWithdrawalAnnual: memberWithdrawalEnabled ? Number(memberWithdrawalAnnual) || 0 : 0,
       civilContractEnabled,
       civilContractAnnual: civilContractEnabled ? Number(civilContractAnnual) || 0 : 0,
       withdrawAll,
@@ -104,6 +107,7 @@ export function CalculatorPage() {
     expenseAmount,
     year,
     memberWithdrawalEnabled,
+    memberWithdrawalAnnual,
     activityStartDate,
     civilContractEnabled,
     civilContractAnnual,
@@ -228,6 +232,22 @@ export function CalculatorPage() {
             <p className="mt-1 ml-6 text-xs text-gray-500">
               GPM 15%, VSD 13.83% + PSD 6.98% nuo bazės. Stažo kaupimas.
             </p>
+            {memberWithdrawalEnabled && (
+              <label className="mt-3 block">
+                <span className="text-sm text-gray-600">Metinė suma (EUR)</span>
+                <input
+                  type="number"
+                  step="1000"
+                  value={memberWithdrawalAnnual}
+                  onChange={(e) => setMemberWithdrawalAnnual(e.target.value)}
+                  placeholder="0 = visas likutis po pelno mokesčio"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  0 arba tuščia = išsiimti visą pelną po pelno mokesčio
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Civil contract */}

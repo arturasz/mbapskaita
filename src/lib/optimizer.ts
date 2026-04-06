@@ -97,11 +97,11 @@ export function calculateOptimizedTax(
 
   // --- Step 3: Lėšos asmeniniams poreikiams (code 02) ---
   if (plan.memberWithdrawalEnabled && afterTaxProfit > 0) {
-    const targetWithdrawal = plan.withdrawAll
-      ? afterTaxProfit
-      : Math.min(Math.max(0, plan.withdrawalTarget - civilContractAmount), afterTaxProfit);
-
-    const amount = targetWithdrawal;
+    // Amount: explicit if set, otherwise all remaining after-tax profit
+    const requested = plan.memberWithdrawalAnnual > 0
+      ? plan.memberWithdrawalAnnual
+      : afterTaxProfit;
+    const amount = Math.min(requested, afterTaxProfit);
     if (amount > 0) {
       // Sodra base = amount × sodraMemberBasePercent (50% or 90%)
       const sodraBase = r2(amount * rates.sodraMemberBasePercent);
