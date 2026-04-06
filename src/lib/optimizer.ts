@@ -239,7 +239,7 @@ export function calculateMonthlySodraFromPlan(
 }
 
 /**
- * Generate obligations timeline for the year.
+ * Generate obligations timeline with step-by-step instructions.
  */
 export function generateObligations(
   year: number,
@@ -261,6 +261,22 @@ export function generateObligations(
         amount: monthlySodraAmount,
         recurring: "monthly",
         category: "sodra",
+        steps: [
+          {
+            action: "Prisijunkite prie Sodra draudėjų portalo",
+            portal: "https://draudejai.sodra.lt",
+          },
+          {
+            action: "Patikrinkite apskaičiuotą įmokų sumą (arba apskaičiuokite pagal savo bazę)",
+          },
+          {
+            action: "Atlikite mokėjimą banku į Sodra sąskaitą",
+            account: "Gavėjas: Sodra. Įmokos kodas: nurodytas portale. Mokėkite iš MB arba asmeninės sąskaitos.",
+          },
+          {
+            action: "Įsitikinkite kad mokėjimas atliktas iki mėnesio 15 d.",
+          },
+        ],
       });
     }
   }
@@ -271,11 +287,21 @@ export function generateObligations(
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "PSD įmoka (privaloma)",
-        description: "Minimali PSD nuo MMA",
+        description: "Minimali PSD nuo MMA — privaloma net be Sodra registracijos",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         amount: r2(rates.minMonthlyWage * rates.psd),
         recurring: "monthly",
         category: "sodra",
+        steps: [
+          {
+            action: "Prisijunkite prie Sodra portalo",
+            portal: "https://gyventojai.sodra.lt",
+          },
+          {
+            action: "Atlikite PSD mokėjimą banku",
+            account: "Gavėjas: Sodra. Tai privaloma sveikatos draudimo įmoka nuo MMA.",
+          },
+        ],
       });
     }
   }
@@ -285,42 +311,158 @@ export function generateObligations(
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "SAV pranešimas",
-        description: "Sodra SAV pranešimas",
+        description: "Sodra mėnesinis pranešimas apie apdraustųjų valstybinio socialinio draudimo įmokas",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         recurring: "monthly",
         category: "declaration",
+        steps: [
+          {
+            action: "Prisijunkite prie Sodra draudėjų portalo",
+            portal: "https://draudejai.sodra.lt",
+          },
+          {
+            action: 'Eikite į "Pranešimai" \u2192 "SAV pranešimas"',
+          },
+          {
+            action: "Užpildykite: nurodykite VSD ir PSD bazę, draudimo laikotarpį",
+          },
+          {
+            action: "Pateikite pranešimą. Terminas — iki mėnesio 15 d.",
+          },
+        ],
       });
     }
   }
 
-  // GPM withholding for civil contract
+  // GPM for civil contract
   if (plan.civilContractEnabled) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
-        name: "GPM deklaracija (FR0572)",
-        description: "Mėnesinė GPM deklaracija VMI",
+        name: "GPM deklaravimas ir mokėjimas",
+        description: "Mėnesinis GPM nuo civilinės sutarties išmokų",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         recurring: "monthly",
         category: "gpm",
+        steps: [
+          {
+            action: "Prisijunkite prie VMI portalo (EDS)",
+            portal: "https://deklaravimas.vmi.lt",
+          },
+          {
+            action: "Pateikite FR0572 formą — mėnesinę GPM deklaraciją",
+            form: "FR0572",
+          },
+          {
+            action: "Nurodykite išmokėtą sumą pagal civilinę sutartį ir apskaičiuotą GPM (15%)",
+          },
+          {
+            action: "Perveskite GPM sumą į VMI biudžeto sąskaitą",
+            account: "Gavėjas: VMI. Mokėjimo kodas: 1001 (GPM). Mokėkite iš MB sąskaitos — MB yra mokesčio agentas.",
+          },
+        ],
       });
     }
   }
 
-  // Annual declarations
+  // GPM for dividends (annual, not monthly)
+  if (plan.dividendsEnabled && !plan.civilContractEnabled) {
+    obligations.push({
+      name: "GPM nuo pelno išėmimo",
+      description: "GPM deklaravimas ir sumokėjimas nuo išimto pelno",
+      dueDate: `${year + 1}-05-01`,
+      amount: result.totalGpm,
+      recurring: "annual",
+      category: "gpm",
+      steps: [
+        {
+          action: "Deklaruokite pelno išėmimą metinėje GPM314 deklaracijoje",
+          portal: "https://deklaravimas.vmi.lt",
+          form: "GPM314",
+        },
+        {
+          action: "GPM nuo pelno išėmimo sumokamas kartu su metine deklaracija",
+          account: "Gavėjas: VMI. Mokėjimo kodas: 1001 (GPM).",
+        },
+      ],
+    });
+  }
+
+  // Annual GPM declaration
   obligations.push({
     name: "Metinė GPM deklaracija (GPM314)",
-    description: "Metinė pajamų deklaracija",
+    description: "Metinė pajamų mokesčio deklaracija — visos pajamos ir mokesčiai",
     dueDate: `${year + 1}-05-01`,
     recurring: "annual",
     category: "declaration",
+    steps: [
+      {
+        action: "Prisijunkite prie VMI EDS sistemos",
+        portal: "https://deklaravimas.vmi.lt",
+      },
+      {
+        action: "Pildykite GPM314 formą",
+        form: "GPM314",
+      },
+      {
+        action: "Nurodykite visas metines pajamas: civilinės sutarties išmokas, pelno išėmimus, investicijų pajamas",
+      },
+      {
+        action: "Nurodykite sumokėtus mokesčius per metus (GPM, Sodra)",
+      },
+      {
+        action: "Pateikite deklaraciją. Jei yra GPM skirtumas — sumokėkite arba laukite grąžinimo.",
+        account: "Gavėjas: VMI. Mokėjimo kodas: 1001.",
+      },
+    ],
   });
 
+  // Annual MB financial statements
   obligations.push({
-    name: "Finansinė atskaitomybė",
-    description: "Metinė ataskaita Registrų centrui",
+    name: "MB finansinė atskaitomybė",
+    description: "Metiniai finansiniai dokumentai Registrų centrui",
     dueDate: `${year + 1}-06-30`,
     recurring: "annual",
     category: "declaration",
+    steps: [
+      {
+        action: "Paruoškite MB balanso ataskaitą ir pelno/nuostolių ataskaitą",
+      },
+      {
+        action: "Prisijunkite prie Registrų centro portalo",
+        portal: "https://jar.registrucentras.lt",
+      },
+      {
+        action: "Pateikite metinę finansinę ataskaitą elektroniniu būdu",
+      },
+      {
+        action: "Terminas — iki kitų metų birželio 30 d.",
+      },
+    ],
+  });
+
+  // Annual MB pelno mokestis declaration (if applicable)
+  obligations.push({
+    name: "MB pelno mokesčio deklaracija",
+    description: "PLN204 forma — MB pelno mokestis (0% jei pelnas neviršija 300k EUR ir < 10 darbuotojų)",
+    dueDate: `${year + 1}-06-15`,
+    recurring: "annual",
+    category: "declaration",
+    steps: [
+      {
+        action: "Prisijunkite prie VMI EDS",
+        portal: "https://deklaravimas.vmi.lt",
+      },
+      {
+        action: "Pildykite PLN204 formą (MB pelno mokesčio deklaracija)",
+        form: "PLN204",
+      },
+      {
+        action: "MB su pajamomis < 300 000 EUR ir < 10 darbuotojų — 0% pelno mokesčio tarifas",
+      },
+      {
+        action: "Pateikite deklaraciją iki birželio 15 d.",
+      },
+    ],
   });
 
   return obligations.sort((a, b) => a.dueDate.localeCompare(b.dueDate));

@@ -179,23 +179,45 @@ export function DashboardPage() {
           {allObligations.length === 0 ? (
             <p className="text-sm text-gray-500">Įsipareigojimų nerasta</p>
           ) : (
-            <ul className="space-y-3 max-h-96 overflow-y-auto">
+            <ul className="space-y-1 max-h-[600px] overflow-y-auto">
               {allObligations.map((o, i) => {
                 const isPast = o.dueDate < today;
                 return (
-                <li key={i} className={`flex items-start justify-between ${isPast ? "opacity-40" : ""}`}>
-                  <div>
-                    <p className={`text-sm font-medium ${isPast ? "text-gray-400 line-through" : "text-gray-900"}`}>{o.name}</p>
-                    <p className="text-xs text-gray-500">{o.description}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className={`text-sm ${isPast ? "text-gray-400" : "text-gray-600"}`}>
-                      {new Date(o.dueDate).toLocaleDateString("lt-LT")}
-                    </span>
-                    {o.amount != null && (
-                      <p className={`text-xs font-medium ${isPast ? "text-gray-400" : "text-gray-700"}`}>{fmt(o.amount)}</p>
+                <li key={i} className={isPast ? "opacity-40" : ""}>
+                  <details className="group">
+                    <summary className="flex cursor-pointer items-start justify-between rounded-md px-2 py-2 hover:bg-gray-50">
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${isPast ? "text-gray-400 line-through" : "text-gray-900"}`}>{o.name}</p>
+                        <p className="text-xs text-gray-500">{o.description}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className={`text-sm ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                          {new Date(o.dueDate).toLocaleDateString("lt-LT")}
+                        </span>
+                        {o.amount != null && (
+                          <p className={`text-xs font-medium ${isPast ? "text-gray-400" : "text-gray-700"}`}>{fmt(o.amount)}</p>
+                        )}
+                      </div>
+                    </summary>
+                    {o.steps.length > 0 && (
+                      <ol className="ml-4 mt-2 mb-3 space-y-2 border-l-2 border-blue-200 pl-4">
+                        {o.steps.map((step, j) => (
+                          <li key={j} className="text-sm">
+                            <p className="text-gray-700">{j + 1}. {step.action}</p>
+                            {step.portal && (
+                              <p className="mt-0.5 text-xs text-blue-600">{step.portal}</p>
+                            )}
+                            {step.form && (
+                              <p className="mt-0.5 text-xs text-gray-500">Forma: <span className="font-mono font-medium">{step.form}</span></p>
+                            )}
+                            {step.account && (
+                              <p className="mt-0.5 text-xs text-gray-500">{step.account}</p>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
                     )}
-                  </div>
+                  </details>
                 </li>
                 );
               })}

@@ -189,13 +189,21 @@ export interface OptimizedTaxResult {
   remainingInMB: number; // profit not yet withdrawn
 }
 
+export interface ObligationStep {
+  action: string;
+  portal?: string; // URL or portal name
+  form?: string; // form code
+  account?: string; // bank account / payment details
+}
+
 export interface Obligation {
   name: string;
   description: string;
-  dueDate: string; // ISO date
+  dueDate: string;
   amount?: number;
   recurring: "monthly" | "quarterly" | "annual" | "once";
   category: "sodra" | "gpm" | "vat" | "declaration" | "other";
+  steps: ObligationStep[];
 }
 
 export interface QuarterlyVATSummary {
