@@ -45,9 +45,34 @@ export function DashboardPage() {
     updateSettings({ fiscalYear: newYear });
   };
 
+  // Blend actual incomes with projected future months
+  const projectedIncomes = useMemo(() => {
+    const planned = settings.plannedMonthlyIncome;
+    if (!planned || planned <= 0) return incomes;
+
+    const now = new Date();
+    const currentMonth = now.getFullYear() === year ? now.getMonth() : 12;
+    const projected = [...incomes];
+
+    for (let m = currentMonth; m < 12; m++) {
+      projected.push({
+        id: `projected-${year}-${m}`,
+        date: `${year}-${String(m + 1).padStart(2, "0")}-15`,
+        description: "Planuojamos pajamos",
+        amount: planned,
+        currency: "USD",
+        amountEur: planned, // user enters in EUR equivalent
+        category: "services",
+        client: "Prognozė",
+        sourceCountry: "US",
+      });
+    }
+    return projected;
+  }, [incomes, year, settings.plannedMonthlyIncome]);
+
   const result = useMemo(
-    () => calculateOptimizedTax(incomes, expenses, year, settings.withdrawalPlan),
-    [incomes, expenses, year, settings.withdrawalPlan],
+    () => calculateOptimizedTax(projectedIncomes, expenses, year, settings.withdrawalPlan),
+    [projectedIncomes, expenses, year, settings.withdrawalPlan],
   );
 
   const monthlySodra = useMemo(
@@ -94,8 +119,17 @@ export function DashboardPage() {
         </div>
       )}
 
+      {settings.plannedMonthlyIncome > 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-sm text-blue-800">
+            Skaičiai apima prognozę: {fmt(settings.plannedMonthlyIncome)}/mėn. likusiam laikotarpiui.
+            Faktinės pajamos: {fmt(incomes.filter((i) => i.date.startsWith(String(year))).reduce((s, i) => s + i.amountEur, 0))}.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Pajamos" value={fmt(result.totalIncome)} />
+        <StatCard label="Pajamos (su prognoze)" value={fmt(result.totalIncome)} />
         <StatCard label="Išlaidos" value={fmt(result.totalExpenses)} />
         <StatCard label="Mokesčiai" value={fmt(result.totalTax)} subtitle={`Efektyvus tarifas: ${(result.effectiveRate * 100).toFixed(1)}%`} />
         <StatCard label="Grynos pajamos" value={fmt(result.totalNet)} trend="up" />

@@ -106,6 +106,20 @@ export function SettingsPage() {
             </span>
           </label>
           <label className="block">
+            <span className="text-sm font-medium text-gray-700">Planuojamos mėnesinės pajamos (EUR)</span>
+            <input
+              type="number"
+              step="100"
+              value={settings.plannedMonthlyIncome || ""}
+              onChange={(e) => handleChange({ plannedMonthlyIncome: Number(e.target.value) || 0 })}
+              placeholder="pvz. 5000"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <span className="mt-1 text-xs text-gray-500">
+              Dashboard naudos šią sumą prognozuoti likusius mėnesius
+            </span>
+          </label>
+          <label className="block">
             <span className="text-sm font-medium text-gray-700">Fiskaliniai metai</span>
             <select
               value={settings.fiscalYear}

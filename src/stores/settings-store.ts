@@ -11,6 +11,7 @@ const defaultSettings: Settings = {
   fiscalYear: new Date().getFullYear(),
   memberName: "",
   mbName: "",
+  plannedMonthlyIncome: 0,
   withdrawalPlan: {
     salaryEnabled: false,
     salaryMonthly: 0,

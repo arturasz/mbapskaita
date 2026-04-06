@@ -131,6 +131,7 @@ export interface Settings {
   mbName: string;
   activityStartDate?: string;
   withdrawalPlan: WithdrawalPlan;
+  plannedMonthlyIncome: number; // expected monthly income in EUR (for projections)
 }
 
 // --- Tax calculation results ---
