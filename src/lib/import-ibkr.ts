@@ -42,6 +42,10 @@ export async function parseIBKRActivityStatement(
         return idx !== -1 ? cols[idx]?.trim() ?? "" : "";
       };
 
+      // Only process stocks — skip Forex, Options, Bonds, etc.
+      const assetCategory = get("asset category").toLowerCase();
+      if (assetCategory && assetCategory !== "stocks") continue;
+
       const symbol = get("symbol");
       const currency = normalizeCurrency(get("currency"));
       const dateTime = get("date/time") || get("date");
