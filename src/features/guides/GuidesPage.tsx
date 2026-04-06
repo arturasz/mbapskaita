@@ -23,10 +23,17 @@ Mažoji bendrija — tai juridinis asmuo, tinkamas smulkiam verslui. Pagrindinia
 
 ### Mokesčiai
 
-MB narys, dirbantis pagal civilinę sutartį, moka:
-- **GPM** — 15% nuo pajamų
-- **VSD** — 12.52% nuo 90% pelno (Sodra pensija)
-- **PSD** — 6.98% nuo 90% pelno (Sodra sveikata)`,
+MB narys moka priklausomai nuo pajamų gavimo būdo:
+
+**Su civiline sutartimi:**
+- **GPM** — 15% nuo (pajamos - Sodra įmokos)
+- **VSD** — 12.52% nuo faktinių išmokų (Sodra pensija)
+- **PSD** — 6.98% nuo faktinių išmokų (Sodra sveikata)
+
+**Pelno išėmimas (be civilinės sutarties):**
+- **GPM** — 15% nuo išimto pelno
+- **VSD** — savanoriška (rekomenduojama stažui kaupti)
+- **PSD** — privaloma nuo MMA bazės`,
   },
   {
     id: "vat-guide",
@@ -80,15 +87,28 @@ Avansinis GPM mokamas kas ketvirtį.`,
 
 MB narys, gaunantis pajamas pagal civilinę sutartį, privalo mokėti Sodra įmokas:
 
-### VSD (pensija) — 12.52%
-- Bazė: **90% pelno**
+### Su civiline sutartimi
+
+**VSD (pensija) — 12.52%**
+- Bazė: **faktinės išmokos** nariui
 - Lubos: ~120 000 EUR per metus (priklauso nuo VDU)
 - Mokama kas mėnesį iki 15 d.
 
-### PSD (sveikata) — 6.98%
-- Bazė: **90% pelno**
+**PSD (sveikata) — 6.98%**
+- Bazė: **faktinės išmokos** nariui
 - Lubų nėra
 - Mokama kas mėnesį iki 15 d.
+
+### Pelno išėmimas (be civilinės sutarties)
+
+- **GPM** 15% nuo išimto pelno
+- **VSD** — savanoriška. Rekomenduojama mokėti nuo MMA bazės stažui rinkti
+- **PSD** — privaloma nuo MMA bazės
+
+### Stažas
+
+1 mėn. stažo = VSD sumokėta nuo >= 1 MMA bazės.
+Jei bazė mažesnė už MMA — stažas proporcingai mažesnis.
 
 ### Minimali įmoka
 

@@ -12,7 +12,7 @@ import {
   exportFullBackup,
   importFullBackup,
 } from "../../lib/export";
-import type { Currency, VATScheme } from "../../types";
+import type { Currency, VATScheme, MBIncomeMode } from "../../types";
 
 const availableYears = Object.keys(taxRatesByYear).map(Number);
 
@@ -99,6 +99,36 @@ export function SettingsPage() {
               Sodra lengvata taikoma pirmus 2 kalendorinius metus
             </span>
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Pajamų gavimo būdas</span>
+            <select
+              value={settings.incomeMode}
+              onChange={(e) => handleChange({ incomeMode: e.target.value as MBIncomeMode })}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="civil_contract">Civilinė sutartis (Sodra nuo išmokų)</option>
+              <option value="profit_withdrawal">Pelno išėmimas (tik GPM)</option>
+            </select>
+            <span className="mt-1 text-xs text-gray-500">
+              {settings.incomeMode === "civil_contract"
+                ? "VSD+PSD skaičiuojama nuo faktinių išmokų"
+                : "Tik GPM 15%. Sodra savanoriška (stažui rinkti)."}
+            </span>
+          </label>
+          {settings.incomeMode === "profit_withdrawal" && (
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={settings.voluntarySodra}
+                onChange={(e) => handleChange({ voluntarySodra: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Savanoriška Sodra (stažui)</span>
+                <p className="text-xs text-gray-500">Mokėti VSD+PSD nuo MMA bazės stažui kaupti</p>
+              </div>
+            </label>
+          )}
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Fiskaliniai metai</span>
             <select

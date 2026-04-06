@@ -18,6 +18,16 @@ export type Quarter = 1 | 2 | 3 | 4;
 
 export type VATScheme = "standard" | "margin" | "exempt";
 
+/**
+ * How the MB member receives income:
+ * - civil_contract: works under civilinė sutartis with the MB.
+ *   Sodra (VSD+PSD) calculated on actual payments received.
+ * - profit_withdrawal: withdraws profit (pelno išėmimas).
+ *   Only GPM 15% on withdrawn amount. No mandatory Sodra from MB,
+ *   but member can pay voluntary Sodra for stažas.
+ */
+export type MBIncomeMode = "civil_contract" | "profit_withdrawal";
+
 // --- Core records ---
 
 export type IncomeSourceCountry = "LT" | "US" | "GB" | "DE" | "Other";
@@ -109,6 +119,8 @@ export interface Settings {
   memberName: string;
   mbName: string;
   activityStartDate?: string; // ISO date — veiklos pradžia (Sodra lengvatos pirmus 2 m.)
+  incomeMode: MBIncomeMode;
+  voluntarySodra: boolean; // for profit_withdrawal: pay voluntary Sodra for stažas?
 }
 
 // --- Tax calculation results ---
@@ -142,6 +154,8 @@ export interface MonthlySodra {
   psdAmount: number;
   total: number;
   cumulative: number; // year-to-date total
+  stazasMonths: number; // pension qualifying months earned this month (0-1)
+  stazasCumulative: number; // year-to-date stažas
 }
 
 export interface QuarterlyGPM {

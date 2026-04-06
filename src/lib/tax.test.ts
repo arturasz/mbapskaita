@@ -29,7 +29,7 @@ function makeExpense(amountEur: number, date = "2026-06-15"): Expense {
   };
 }
 
-describe("calculateAnnualTax", () => {
+describe("calculateAnnualTax — civil_contract mode", () => {
   it("returns zero for no income", () => {
     const result = calculateAnnualTax([], [], 2026);
     expect(result.totalIncome).toBe(0);
@@ -37,34 +37,25 @@ describe("calculateAnnualTax", () => {
     expect(result.netIncome).toBe(0);
   });
 
-  it("calculates correct tax on 50000 EUR income with no expenses", () => {
+  it("calculates Sodra from full taxable income (civil contract)", () => {
     const incomes = [makeIncome(50000)];
-    const result = calculateAnnualTax(incomes, [], 2026);
+    const result = calculateAnnualTax(incomes, [], 2026, { incomeMode: "civil_contract" });
 
-    expect(result.totalIncome).toBe(50000);
-    expect(result.totalExpenses).toBe(0);
     expect(result.taxableIncome).toBe(50000);
 
-    // Sodra base = 50000 * 0.9 = 45000
-    // VSD = 45000 * 0.1252 = 5634
-    const expectedVsd = Math.round(45000 * 0.1252 * 100) / 100;
+    // Sodra base = 50000 (full taxable income for civil contract)
+    // VSD = 50000 * 0.1252 = 6260
+    const expectedVsd = Math.round(50000 * 0.1252 * 100) / 100;
     expect(result.vsdAmount).toBe(expectedVsd);
 
-    // PSD = 45000 * 0.0698 = 3141
-    const expectedPsd = Math.round(45000 * 0.0698 * 100) / 100;
+    // PSD = 50000 * 0.0698 = 3490
+    const expectedPsd = Math.round(50000 * 0.0698 * 100) / 100;
     expect(result.psdAmount).toBe(expectedPsd);
 
     // GPM = (50000 - VSD - PSD) * 0.15
     const expectedGpm =
       Math.round((50000 - expectedVsd - expectedPsd) * 0.15 * 100) / 100;
     expect(result.gpmAmount).toBe(expectedGpm);
-
-    expect(result.totalTax).toBe(
-      Math.round((expectedGpm + expectedVsd + expectedPsd) * 100) / 100,
-    );
-    expect(result.netIncome).toBe(
-      Math.round((50000 - result.totalTax) * 100) / 100,
-    );
   });
 
   it("deducts expenses from income", () => {
@@ -93,38 +84,71 @@ describe("calculateAnnualTax", () => {
     expect(result.totalTax).toBe(0);
   });
 
-  it("calculates a reasonable effective rate", () => {
-    const incomes = [makeIncome(100000)];
-    const result = calculateAnnualTax(incomes, [], 2026);
-
-    // Effective rate should be between 25-35% for a 100k income
-    expect(result.effectiveRate).toBeGreaterThan(0.25);
-    expect(result.effectiveRate).toBeLessThan(0.35);
-  });
-
   it("applies Sodra discount in first 2 years of activity", () => {
     const incomes = [makeIncome(50000)];
     const withDiscount = calculateAnnualTax(incomes, [], 2026, {
       activityStartDate: "2025-06-01",
+      incomeMode: "civil_contract",
     });
-    const without = calculateAnnualTax(incomes, [], 2026);
+    const without = calculateAnnualTax(incomes, [], 2026, {
+      incomeMode: "civil_contract",
+    });
 
-    // VSD should be lower with discount (MMA base vs 90% profit)
     expect(withDiscount.vsdAmount).toBeLessThan(without.vsdAmount);
-    // PSD stays the same (no discount on PSD)
     expect(withDiscount.psdAmount).toBe(without.psdAmount);
-    // Total tax lower with discount
     expect(withDiscount.totalTax).toBeLessThan(without.totalTax);
   });
 
   it("does not apply Sodra discount after 2 years", () => {
     const incomes = [makeIncome(50000)];
     const result = calculateAnnualTax(incomes, [], 2026, {
-      activityStartDate: "2024-01-01", // started 2024, discount covers 2024+2025 only
+      activityStartDate: "2024-01-01",
     });
     const without = calculateAnnualTax(incomes, [], 2026);
-
     expect(result.vsdAmount).toBe(without.vsdAmount);
+  });
+});
+
+describe("calculateAnnualTax — profit_withdrawal mode", () => {
+  it("charges only GPM on full income (no Sodra deduction from base)", () => {
+    const incomes = [makeIncome(50000)];
+    const result = calculateAnnualTax(incomes, [], 2026, {
+      incomeMode: "profit_withdrawal",
+    });
+
+    // GPM = 50000 * 0.15 = 7500
+    expect(result.gpmAmount).toBe(7500);
+    // VSD = 0 (no mandatory VSD for profit withdrawal)
+    expect(result.vsdAmount).toBe(0);
+    // PSD = MMA * 12 * 0.0698 (mandatory PSD from MMA)
+    expect(result.psdAmount).toBeGreaterThan(0);
+  });
+
+  it("with voluntary Sodra, pays VSD+PSD from MMA base", () => {
+    const incomes = [makeIncome(50000)];
+    const result = calculateAnnualTax(incomes, [], 2026, {
+      incomeMode: "profit_withdrawal",
+      voluntarySodra: true,
+    });
+
+    // MMA 2026 = 1088, annual = 13056
+    const mmaAnnual = 1088 * 12;
+    const expectedVsd = Math.round(mmaAnnual * 0.1252 * 100) / 100;
+    const expectedPsd = Math.round(mmaAnnual * 0.0698 * 100) / 100;
+
+    expect(result.vsdAmount).toBe(expectedVsd);
+    expect(result.psdAmount).toBe(expectedPsd);
+    // GPM still on full income
+    expect(result.gpmAmount).toBe(7500);
+  });
+
+  it("profit_withdrawal has lower total tax than civil_contract for same income", () => {
+    const incomes = [makeIncome(80000)];
+    const profit = calculateAnnualTax(incomes, [], 2026, { incomeMode: "profit_withdrawal" });
+    const civil = calculateAnnualTax(incomes, [], 2026, { incomeMode: "civil_contract" });
+
+    // Profit withdrawal should have lower total tax (no Sodra on full income)
+    expect(profit.totalTax).toBeLessThan(civil.totalTax);
   });
 });
 

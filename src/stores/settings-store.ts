@@ -11,6 +11,8 @@ const defaultSettings: Settings = {
   fiscalYear: new Date().getFullYear(),
   memberName: "",
   mbName: "",
+  incomeMode: "civil_contract",
+  voluntarySodra: false,
 };
 
 interface SettingsStore {

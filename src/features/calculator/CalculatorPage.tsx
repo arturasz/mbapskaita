@@ -4,7 +4,7 @@ import { StatCard } from "../../components/StatCard";
 import { Badge } from "../../components/Badge";
 import { calculateAnnualTax, isInSodraDiscountPeriod } from "../../lib/tax";
 import { taxRatesByYear } from "../../data/tax-rates";
-import type { Income, Expense, IncomeSourceCountry } from "../../types";
+import type { Income, Expense, IncomeSourceCountry, MBIncomeMode } from "../../types";
 
 function fmt(n: number): string {
   return n.toLocaleString("lt-LT", { style: "currency", currency: "EUR" });
@@ -18,6 +18,8 @@ export function CalculatorPage() {
   const [expenseAmount, setExpenseAmount] = useState("");
   const [activityStartDate, setActivityStartDate] = useState("");
   const [sourceCountry, setSourceCountry] = useState<IncomeSourceCountry>("US");
+  const [incomeMode, setIncomeMode] = useState<MBIncomeMode>("civil_contract");
+  const [voluntarySodra, setVoluntarySodra] = useState(false);
 
   const discountActive = isInSodraDiscountPeriod(year, activityStartDate || undefined);
 
@@ -57,8 +59,10 @@ export function CalculatorPage() {
 
     return calculateAnnualTax(fakeIncome, fakeExpense, year, {
       activityStartDate: activityStartDate || undefined,
+      incomeMode,
+      voluntarySodra,
     });
-  }, [income, expenseAmount, year, activityStartDate, sourceCountry]);
+  }, [income, expenseAmount, year, activityStartDate, sourceCountry, incomeMode, voluntarySodra]);
 
   return (
     <div className="space-y-6">
@@ -102,6 +106,28 @@ export function CalculatorPage() {
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Pajamų būdas</span>
+            <select
+              value={incomeMode}
+              onChange={(e) => setIncomeMode(e.target.value as MBIncomeMode)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="civil_contract">Civilinė sutartis</option>
+              <option value="profit_withdrawal">Pelno išėmimas</option>
+            </select>
+          </label>
+          {incomeMode === "profit_withdrawal" && (
+            <label className="flex items-center gap-2 self-end">
+              <input
+                type="checkbox"
+                checked={voluntarySodra}
+                onChange={(e) => setVoluntarySodra(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm text-gray-700">Savanoriška Sodra (stažui)</span>
+            </label>
+          )}
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Pajamų šaltinis</span>
             <select

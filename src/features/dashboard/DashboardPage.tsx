@@ -47,8 +47,12 @@ export function DashboardPage() {
   };
 
   const opts = useMemo(
-    () => ({ activityStartDate: settings.activityStartDate }),
-    [settings.activityStartDate],
+    () => ({
+      activityStartDate: settings.activityStartDate,
+      incomeMode: settings.incomeMode,
+      voluntarySodra: settings.voluntarySodra,
+    }),
+    [settings.activityStartDate, settings.incomeMode, settings.voluntarySodra],
   );
 
   const tax = useMemo(
@@ -64,6 +68,11 @@ export function DashboardPage() {
   const quarterlyGPM = useMemo(
     () => calculateQuarterlyGPM(incomes, expenses, year, opts),
     [incomes, expenses, year, opts],
+  );
+
+  const annualStazas = useMemo(
+    () => monthlySodra.length > 0 ? monthlySodra[monthlySodra.length - 1].stazasCumulative : 0,
+    [monthlySodra],
   );
 
   const deadlines = useMemo(() => getUpcomingDeadlines(new Date(), 5), []);
@@ -87,11 +96,17 @@ export function DashboardPage() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Pajamos" value={fmt(tax.totalIncome)} />
         <StatCard label="Išlaidos" value={fmt(tax.totalExpenses)} />
         <StatCard label="Mokesčiai" value={fmt(tax.totalTax)} subtitle={`Efektyvus tarifas: ${(tax.effectiveRate * 100).toFixed(1)}%`} />
         <StatCard label="Grynos pajamos" value={fmt(tax.netIncome)} trend="up" />
+        <StatCard
+          label="Stažas"
+          value={`${annualStazas.toFixed(1)} mėn.`}
+          subtitle={annualStazas >= 12 ? "Pilni metai" : `Trūksta ${(12 - annualStazas).toFixed(1)} mėn.`}
+          trend={annualStazas >= 12 ? "up" : "down"}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -178,6 +193,7 @@ export function DashboardPage() {
                 <th className="px-3 py-2 text-right">PSD</th>
                 <th className="px-3 py-2 text-right">Viso</th>
                 <th className="px-3 py-2 text-right">Kumuliacinis</th>
+                <th className="px-3 py-2 text-right">Stažas</th>
               </tr>
             </thead>
             <tbody>
@@ -188,6 +204,7 @@ export function DashboardPage() {
                   <td className="px-3 py-2 text-right">{fmt(m.psdAmount)}</td>
                   <td className="px-3 py-2 text-right font-medium">{fmt(m.total)}</td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmt(m.cumulative)}</td>
+                  <td className="px-3 py-2 text-right text-gray-500">{m.stazasMonths.toFixed(2)} mėn.</td>
                 </tr>
               ))}
             </tbody>
