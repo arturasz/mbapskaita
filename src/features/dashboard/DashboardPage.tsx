@@ -75,6 +75,15 @@ export function DashboardPage() {
     [projectedIncomes, expenses, year, settings.withdrawalPlan],
   );
 
+  const actualIncome = useMemo(
+    () => incomes
+      .filter((i) => i.date.startsWith(String(year)))
+      .reduce((s, i) => s + i.amountEur, 0),
+    [incomes, year],
+  );
+
+  const hasProjection = settings.plannedMonthlyIncome > 0 && result.totalIncome > actualIncome;
+
   const monthlySodra = useMemo(
     () => calculateMonthlySodraFromPlan(year, settings.withdrawalPlan),
     [year, settings.withdrawalPlan],
@@ -127,17 +136,12 @@ export function DashboardPage() {
         </div>
       )}
 
-      {settings.plannedMonthlyIncome > 0 && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-          <p className="text-sm text-blue-800">
-            Skaičiai apima prognozę: {fmt(settings.plannedMonthlyIncome)}/mėn. likusiam laikotarpiui.
-            Faktinės pajamos: {fmt(incomes.filter((i) => i.date.startsWith(String(year))).reduce((s, i) => s + i.amountEur, 0))}.
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Pajamos (su prognoze)" value={fmt(result.totalIncome)} />
+        <StatCard
+          label="Pajamos"
+          value={fmt(actualIncome)}
+          subtitle={hasProjection ? `Prognozė: ${fmt(result.totalIncome)}` : undefined}
+        />
         <StatCard label="Išlaidos" value={fmt(result.totalExpenses)} />
         <StatCard label="Mokesčiai" value={fmt(result.totalTax)} subtitle={`Efektyvus tarifas: ${(result.effectiveRate * 100).toFixed(1)}%`} />
         <StatCard label="Grynos pajamos" value={fmt(result.totalNet)} trend="up" />
