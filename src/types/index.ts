@@ -110,14 +110,22 @@ export interface FilingDeadline {
  * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD, stažas, but watch 45k VAT
  * - dividends: pelno išėmimas — GPM 15%, no Sodra (except mandatory PSD from MMA)
  */
+/**
+ * MB sole member cannot have darbo sutartis with their own MB.
+ * Available methods:
+ * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD from payments, stažas
+ * - dividends: pelno išėmimas — GPM 15%, no Sodra
+ * - sodraSelf: register with Sodra as self-employed, pay VSD+PSD for stažas
+ *   (independent of withdrawal method — can combine with dividends)
+ */
 export interface WithdrawalPlan {
-  salaryEnabled: boolean; // darbo sutartis (alga)
-  salaryMonthly: number; // monthly gross salary amount
-  civilContractEnabled: boolean; // civilinė sutartis
-  civilContractAnnual: number; // annual civil contract amount
-  dividendsEnabled: boolean; // pelno išėmimas / dividendai
-  withdrawAll: boolean; // true = withdraw all profit, false = use withdrawalTarget
-  withdrawalTarget: number; // how much to withdraw (rest stays in MB for investments)
+  civilContractEnabled: boolean;
+  civilContractAnnual: number; // annual amount via civil contract
+  dividendsEnabled: boolean; // pelno išėmimas
+  sodraSelfEnabled: boolean; // pay Sodra independently for stažas
+  sodraSelfBase: number; // monthly base for voluntary Sodra (min MMA)
+  withdrawAll: boolean;
+  withdrawalTarget: number;
 }
 
 // --- App state ---

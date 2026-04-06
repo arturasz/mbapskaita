@@ -13,11 +13,11 @@ const defaultSettings: Settings = {
   mbName: "",
   plannedMonthlyIncome: 0,
   withdrawalPlan: {
-    salaryEnabled: false,
-    salaryMonthly: 0,
-    civilContractEnabled: true,
+    civilContractEnabled: false,
     civilContractAnnual: 0,
     dividendsEnabled: true,
+    sodraSelfEnabled: true,
+    sodraSelfBase: 0, // 0 = use MMA
     withdrawAll: true,
     withdrawalTarget: 0,
   },

@@ -14,14 +14,19 @@ function r2(n: number): number {
 }
 
 /**
- * Calculate optimized tax breakdown across selected withdrawal methods.
+ * Calculate optimized tax breakdown for an MB sole member.
  *
- * Methods:
- * - salary (darbo sutartis): GPM 20%, employee VSD+PSD, employer Sodra. Gives stažas.
- * - civilContract (civilinė sutartis): GPM 15%, VSD+PSD. Gives stažas. Watch 45k VAT.
- * - dividends (pelno išėmimas): GPM 15%. No Sodra except mandatory PSD from MMA.
+ * MB sole member/director CANNOT have darbo sutartis with their own MB.
  *
- * Allocation priority: salary first, then civil contract, rest to dividends.
+ * Available methods:
+ * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD from payments, stažas.
+ *   Watch 45k EUR VAT threshold.
+ * - dividends: pelno išėmimas — GPM 15%, no Sodra.
+ *
+ * Independent Sodra option:
+ * - sodraSelf: register as self-employed with Sodra, pay VSD+PSD from chosen base
+ *   (min MMA). This gives stažas regardless of withdrawal method.
+ *   Sodra cost is separate from withdrawal — it's a personal obligation.
  */
 export function calculateOptimizedTax(
   incomes: Income[],
@@ -41,47 +46,14 @@ export function calculateOptimizedTax(
 
   const mbProfit = Math.max(0, totalIncome - totalExpenses);
 
-  // How much the member wants to withdraw (rest stays in MB for investments etc.)
   const targetWithdrawal = plan.withdrawAll
     ? mbProfit
     : Math.min(plan.withdrawalTarget, mbProfit);
 
   const withdrawals: WithdrawalBreakdown[] = [];
   let remaining = targetWithdrawal;
-  let hasSodraStazas = false; // track if any method provides stažas
 
-  // 1. Salary (darbo sutartis)
-  if (plan.salaryEnabled && plan.salaryMonthly > 0) {
-    const annualGross = Math.min(plan.salaryMonthly * 12, remaining);
-    const vsd = r2(Math.min(annualGross, rates.sodraCeiling) * rates.vsd);
-    const psd = r2(annualGross * rates.psd);
-    const gpmBase = Math.max(0, annualGross - vsd - psd);
-    const gpm = r2(gpmBase * rates.gpmEmployment);
-    const employerSodra = r2(annualGross * rates.employerSodra);
-    const totalTax = r2(gpm + vsd + psd + employerSodra);
-
-    // Stažas: proportional to salary vs MMA
-    const stazas = r2(Math.min(12, (annualGross / 12) / rates.minMonthlyWage * 12));
-
-    withdrawals.push({
-      method: "salary",
-      label: "Darbo sutartis (alga)",
-      amount: annualGross,
-      gpm,
-      gpmRate: rates.gpmEmployment,
-      vsd,
-      psd,
-      employerSodra,
-      totalTax,
-      netAmount: r2(annualGross - gpm - vsd - psd),
-      stazasMonths: Math.min(12, stazas),
-    });
-
-    remaining = r2(remaining - annualGross - employerSodra); // employer Sodra is MB expense
-    hasSodraStazas = true;
-  }
-
-  // 2. Civil contract (civilinė sutartis)
+  // 1. Civil contract (civilinė sutartis)
   if (plan.civilContractEnabled && plan.civilContractAnnual > 0) {
     const amount = Math.min(plan.civilContractAnnual, remaining);
     const vsd = r2(Math.min(amount, rates.sodraCeiling) * rates.vsd);
@@ -107,30 +79,22 @@ export function calculateOptimizedTax(
     });
 
     remaining = r2(remaining - amount);
-    hasSodraStazas = true;
   }
 
-  // 3. Dividends (pelno išėmimas) — gets whatever is left
+  // 2. Dividends (pelno išėmimas) — gets the rest
   if (plan.dividendsEnabled && remaining > 0) {
     const amount = remaining;
     const gpm = r2(amount * rates.gpmDividends);
-
-    // Mandatory PSD from MMA if no other Sodra source
-    const needsMandatoryPsd = !hasSodraStazas;
-    const mandatoryPsd = needsMandatoryPsd
-      ? r2(rates.minMonthlyWage * 12 * rates.psd)
-      : 0;
-
-    const totalTax = r2(gpm + mandatoryPsd);
+    const totalTax = r2(gpm);
 
     withdrawals.push({
       method: "dividends",
-      label: "Pelno išėmimas (dividendai)",
+      label: "Pelno išėmimas",
       amount,
       gpm,
       gpmRate: rates.gpmDividends,
       vsd: 0,
-      psd: mandatoryPsd,
+      psd: 0,
       employerSodra: 0,
       totalTax,
       netAmount: r2(amount - totalTax),
@@ -140,18 +104,46 @@ export function calculateOptimizedTax(
     remaining = 0;
   }
 
-  const totalGpm = r2(withdrawals.reduce((s, w) => s + w.gpm, 0));
-  const totalVsd = r2(withdrawals.reduce((s, w) => s + w.vsd, 0));
-  const totalPsd = r2(withdrawals.reduce((s, w) => s + w.psd, 0));
-  const totalEmployerSodra = r2(withdrawals.reduce((s, w) => s + w.employerSodra, 0));
-  const totalTax = r2(totalGpm + totalVsd + totalPsd + totalEmployerSodra);
-  const totalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0));
-  const stazasMonths = Math.min(
-    12,
-    r2(withdrawals.reduce((s, w) => s + w.stazasMonths, 0)),
-  );
+  // 3. Independent Sodra for stažas (savarankiškai dirbantis asmuo)
+  // This is NOT a withdrawal method — it's a personal Sodra contribution
+  // that gives stažas. The cost comes from personal funds (net income).
+  let sodraSelfVsd = 0;
+  let sodraSelfPsd = 0;
+  let sodraSelfStazas = 0;
 
-  // Stažas already counted across methods — cap at 12
+  const civilContractStazas = withdrawals
+    .filter((w) => w.method === "civilContract")
+    .reduce((s, w) => s + w.stazasMonths, 0);
+
+  if (plan.sodraSelfEnabled) {
+    const monthlyBase = plan.sodraSelfBase > 0
+      ? Math.max(plan.sodraSelfBase, rates.minMonthlyWage)
+      : rates.minMonthlyWage;
+    // Only pay Sodra for months not already covered by civil contract stažas
+    const monthsNeeded = Math.max(0, 12 - Math.floor(civilContractStazas));
+
+    sodraSelfVsd = r2(Math.min(monthlyBase * monthsNeeded, rates.sodraCeiling) * rates.vsd);
+    sodraSelfPsd = r2(monthlyBase * monthsNeeded * rates.psd);
+    sodraSelfStazas = r2(Math.min(monthsNeeded, monthsNeeded * monthlyBase / rates.minMonthlyWage));
+  } else {
+    // Mandatory PSD from MMA even without voluntary Sodra
+    // (every resident must have PSD coverage)
+    const hasPsdFromCivilContract = withdrawals.some(
+      (w) => w.method === "civilContract" && w.psd > 0,
+    );
+    if (!hasPsdFromCivilContract) {
+      sodraSelfPsd = r2(rates.minMonthlyWage * 12 * rates.psd);
+    }
+  }
+
+  const totalGpm = r2(withdrawals.reduce((s, w) => s + w.gpm, 0));
+  const totalVsd = r2(withdrawals.reduce((s, w) => s + w.vsd, 0) + sodraSelfVsd);
+  const totalPsd = r2(withdrawals.reduce((s, w) => s + w.psd, 0) + sodraSelfPsd);
+  const totalEmployerSodra = 0; // no employer Sodra for MB sole member
+  const totalTax = r2(totalGpm + totalVsd + totalPsd);
+  const totalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0) - sodraSelfVsd - sodraSelfPsd);
+  const stazasMonths = Math.min(12, r2(civilContractStazas + sodraSelfStazas));
+
   const civilContractTotal = withdrawals
     .filter((w) => w.method === "civilContract")
     .reduce((s, w) => s + w.amount, 0);
@@ -168,7 +160,7 @@ export function calculateOptimizedTax(
     totalEmployerSodra,
     totalTax,
     totalNet,
-    effectiveRate: mbProfit > 0 ? r2(totalTax / mbProfit) : 0,
+    effectiveRate: targetWithdrawal > 0 ? r2(totalTax / targetWithdrawal) : 0,
     stazasMonths,
     vatWarning: civilContractTotal > rates.vatThreshold,
     remainingInMB: r2(mbProfit - targetWithdrawal + remaining),
@@ -190,17 +182,9 @@ export function calculateMonthlySodraFromPlan(
   for (let m = 1; m <= 12; m++) {
     let vsd = 0;
     let psd = 0;
-    let employer = 0;
     let vsdBase = 0;
 
-    if (plan.salaryEnabled && plan.salaryMonthly > 0) {
-      const base = plan.salaryMonthly;
-      vsdBase += base;
-      vsd += r2(Math.min(base, rates.sodraCeiling / 12) * rates.vsd);
-      psd += r2(base * rates.psd);
-      employer += r2(base * rates.employerSodra);
-    }
-
+    // Civil contract Sodra
     if (plan.civilContractEnabled && plan.civilContractAnnual > 0) {
       const monthlyBase = plan.civilContractAnnual / 12;
       vsdBase += monthlyBase;
@@ -208,15 +192,30 @@ export function calculateMonthlySodraFromPlan(
       psd += r2(monthlyBase * rates.psd);
     }
 
-    // If no salary/civil contract, mandatory PSD from MMA
-    if (!plan.salaryEnabled && !plan.civilContractEnabled && plan.dividendsEnabled) {
+    // Independent Sodra for stažas
+    if (plan.sodraSelfEnabled) {
+      const base = plan.sodraSelfBase > 0
+        ? Math.max(plan.sodraSelfBase, rates.minMonthlyWage)
+        : rates.minMonthlyWage;
+      // Only add if civil contract doesn't already cover this month's stažas
+      if (vsdBase < rates.minMonthlyWage) {
+        const additional = base - vsdBase;
+        if (additional > 0) {
+          vsdBase += additional;
+          vsd += r2(Math.min(additional, rates.sodraCeiling / 12) * rates.vsd);
+          psd += r2(additional * rates.psd);
+        }
+      }
+    }
+
+    // Mandatory PSD if nothing else
+    if (vsd === 0 && psd === 0 && plan.dividendsEnabled) {
       psd = r2(rates.minMonthlyWage * rates.psd);
     }
 
     vsd = r2(vsd);
     psd = r2(psd);
-    employer = r2(employer);
-    const total = r2(vsd + psd + employer);
+    const total = r2(vsd + psd);
     cumulative = r2(cumulative + total);
 
     const stazas = rates.minMonthlyWage > 0
@@ -228,7 +227,7 @@ export function calculateMonthlySodraFromPlan(
       month: m,
       vsdAmount: vsd,
       psdAmount: psd,
-      employerSodra: employer,
+      employerSodra: 0,
       total,
       cumulative,
       stazasMonths: stazas,
@@ -248,16 +247,16 @@ export function generateObligations(
   result: OptimizedTaxResult,
 ): Obligation[] {
   const obligations: Obligation[] = [];
-  const hasSodra = plan.salaryEnabled || plan.civilContractEnabled;
-  const monthlySodra = result.totalVsd + result.totalPsd + result.totalEmployerSodra;
+  const hasSodra = plan.civilContractEnabled || plan.sodraSelfEnabled;
+  const monthlySodra = result.totalVsd + result.totalPsd;
   const monthlySodraAmount = monthlySodra > 0 ? r2(monthlySodra / 12) : 0;
 
-  // Monthly Sodra (if applicable)
+  // Monthly Sodra
   if (hasSodra) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "Sodra įmokos",
-        description: `VSD + PSD mėnesinės įmokos${plan.salaryEnabled ? " + darbdavio dalis" : ""}`,
+        description: "VSD + PSD mėnesinės įmokos",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         amount: monthlySodraAmount,
         recurring: "monthly",
@@ -268,8 +267,8 @@ export function generateObligations(
 
   // Mandatory PSD even for dividends-only
   if (!hasSodra && plan.dividendsEnabled) {
+    const rates = getTaxRates(year);
     for (let m = 1; m <= 12; m++) {
-      const rates = getTaxRates(year);
       obligations.push({
         name: "PSD įmoka (privaloma)",
         description: "Minimali PSD nuo MMA",
@@ -281,12 +280,12 @@ export function generateObligations(
     }
   }
 
-  // SAV reports (if Sodra is paid)
+  // SAV reports
   if (hasSodra) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "SAV pranešimas",
-        description: "Sodra SAV pranešimas per Sodra portalą",
+        description: "Sodra SAV pranešimas",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         recurring: "monthly",
         category: "declaration",
@@ -294,8 +293,8 @@ export function generateObligations(
     }
   }
 
-  // GPM withholding (if salary or civil contract)
-  if (plan.salaryEnabled || plan.civilContractEnabled) {
+  // GPM withholding for civil contract
+  if (plan.civilContractEnabled) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "GPM deklaracija (FR0572)",
@@ -307,7 +306,7 @@ export function generateObligations(
     }
   }
 
-  // Annual GPM declaration
+  // Annual declarations
   obligations.push({
     name: "Metinė GPM deklaracija (GPM314)",
     description: "Metinė pajamų deklaracija",
@@ -316,7 +315,6 @@ export function generateObligations(
     category: "declaration",
   });
 
-  // Annual financial statements
   obligations.push({
     name: "Finansinė atskaitomybė",
     description: "Metinė ataskaita Registrų centrui",

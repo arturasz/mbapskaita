@@ -23,22 +23,13 @@ export function CalculatorPage() {
 
   const rates = taxRatesByYear[year];
 
-  const [salaryEnabled, setSalaryEnabled] = useState(false);
-  const [salaryMonthly, setSalaryMonthly] = useState(String(rates?.minMonthlyWage ?? 0));
+  const [sodraSelfEnabled, setSodraSelfEnabled] = useState(true);
+  const [sodraSelfBase, setSodraSelfBase] = useState("");
   const [civilContractEnabled, setCivilContractEnabled] = useState(false);
   const [civilContractAnnual, setCivilContractAnnual] = useState("");
   const [dividendsEnabled, setDividendsEnabled] = useState(true);
   const [withdrawAll, setWithdrawAll] = useState(true);
   const [withdrawalTarget, setWithdrawalTarget] = useState("");
-
-  // Update salary default when year changes
-  const handleYearChange = (newYear: number) => {
-    setYear(newYear);
-    const newRates = taxRatesByYear[newYear];
-    if (newRates && salaryMonthly === String(rates?.minMonthlyWage ?? 0)) {
-      setSalaryMonthly(String(newRates.minMonthlyWage));
-    }
-  };
 
   const result = useMemo(() => {
     const inc = Number(income) || 0;
@@ -76,8 +67,8 @@ export function CalculatorPage() {
         : [];
 
     const plan: WithdrawalPlan = {
-      salaryEnabled,
-      salaryMonthly: salaryEnabled ? Number(salaryMonthly) || 0 : 0,
+      sodraSelfEnabled,
+      sodraSelfBase: sodraSelfEnabled ? Number(sodraSelfBase) || 0 : 0,
       civilContractEnabled,
       civilContractAnnual: civilContractEnabled ? Number(civilContractAnnual) || 0 : 0,
       dividendsEnabled,
@@ -90,8 +81,8 @@ export function CalculatorPage() {
     income,
     expenseAmount,
     year,
-    salaryEnabled,
-    salaryMonthly,
+    sodraSelfEnabled,
+    sodraSelfBase,
     civilContractEnabled,
     civilContractAnnual,
     dividendsEnabled,
@@ -110,7 +101,7 @@ export function CalculatorPage() {
             <span className="text-sm font-medium text-gray-700">Metai</span>
             <select
               value={year}
-              onChange={(e) => handleYearChange(Number(e.target.value))}
+              onChange={(e) => setYear(Number(e.target.value))}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             >
               {availableYears.map((y) => (
@@ -187,35 +178,41 @@ export function CalculatorPage() {
       {/* Withdrawal methods */}
       <Card title="Isemimo budai">
         <div className="space-y-4">
-          {/* Salary */}
+          {/* Sodra stažui */}
           <div className="rounded-md border border-gray-200 p-4">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={salaryEnabled}
-                onChange={(e) => setSalaryEnabled(e.target.checked)}
+                checked={sodraSelfEnabled}
+                onChange={(e) => setSodraSelfEnabled(e.target.checked)}
                 className="rounded border-gray-300"
               />
               <span className="text-sm font-medium text-gray-900">
-                Darbo sutartis (alga)
+                Sodra stažui (savarankiškai)
               </span>
-              <Badge variant="info">GPM 20%</Badge>
+              <Badge variant="success">Stažas</Badge>
             </label>
-            {salaryEnabled && (
+            <p className="mt-1 ml-6 text-xs text-gray-500">
+              GPM netaikomas, VSD+PSD nuo pasirinktos bazės (min MMA), stažo kaupimas
+            </p>
+            {sodraSelfEnabled && (
               <label className="mt-3 block">
                 <span className="text-sm text-gray-600">
-                  Menesinis bruto atlyginimas (EUR)
+                  Mėnesinė Sodra bazė (EUR)
                 </span>
                 <input
                   type="number"
                   step="0.01"
-                  value={salaryMonthly}
-                  onChange={(e) => setSalaryMonthly(e.target.value)}
+                  value={sodraSelfBase}
+                  onChange={(e) => setSodraSelfBase(e.target.value)}
                   placeholder={String(rates?.minMonthlyWage ?? 0)}
                   className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
                 <span className="mt-1 block text-xs text-gray-500">
-                  MMA {year} m.: {fmt(rates?.minMonthlyWage ?? 0)}
+                  0 arba tuščia = MMA ({fmt(rates?.minMonthlyWage ?? 0)})
+                </span>
+                <span className="mt-1 block text-xs text-gray-500">
+                  Registruojatės Sodroje kaip savarankiškai dirbantis. Galima derinti su bet kuriuo išėmimo būdu.
                 </span>
               </label>
             )}
