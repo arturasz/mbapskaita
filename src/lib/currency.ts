@@ -59,9 +59,9 @@ async function fetchECBLatestRate(from: Currency): Promise<number | null> {
   if (!res.ok) return null;
 
   const xml = await res.text();
-  // Parse: <Cube currency="USD" rate="1.0812"/>
+  // Parse: <Cube currency='USD' rate='1.0812'/> (ECB uses single quotes)
   const regex = new RegExp(
-    `<Cube\\s+currency="${from}"\\s+rate="([\\d.]+)"`,
+    `<Cube\\s+currency=['"]${from}['"]\\s+rate=['"]([\\d.]+)['"]`,
   );
   const match = xml.match(regex);
   if (!match) return null;
