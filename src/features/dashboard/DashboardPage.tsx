@@ -85,9 +85,17 @@ export function DashboardPage() {
     [year, settings.withdrawalPlan, result],
   );
 
-  const upcomingObligations = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return obligations.filter((o) => o.dueDate >= today).slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Deduplicate by name+date, show all (past greyed out, upcoming normal)
+  const allObligations = useMemo(() => {
+    const seen = new Set<string>();
+    return obligations.filter((o) => {
+      const key = `${o.name}:${o.dueDate}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }, [obligations]);
 
   if (!incomeLoaded || !expenseLoaded || !settingsLoaded) {
@@ -167,27 +175,30 @@ export function DashboardPage() {
           </dl>
         </Card>
 
-        <Card title="Artimiausi įsipareigojimai">
-          {upcomingObligations.length === 0 ? (
+        <Card title="Įsipareigojimai">
+          {allObligations.length === 0 ? (
             <p className="text-sm text-gray-500">Įsipareigojimų nerasta</p>
           ) : (
-            <ul className="space-y-3">
-              {upcomingObligations.map((o, i) => (
-                <li key={i} className="flex items-start justify-between">
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {allObligations.map((o, i) => {
+                const isPast = o.dueDate < today;
+                return (
+                <li key={i} className={`flex items-start justify-between ${isPast ? "opacity-40" : ""}`}>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{o.name}</p>
+                    <p className={`text-sm font-medium ${isPast ? "text-gray-400 line-through" : "text-gray-900"}`}>{o.name}</p>
                     <p className="text-xs text-gray-500">{o.description}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="text-sm text-gray-600">
+                    <span className={`text-sm ${isPast ? "text-gray-400" : "text-gray-600"}`}>
                       {new Date(o.dueDate).toLocaleDateString("lt-LT")}
                     </span>
                     {o.amount != null && (
-                      <p className="text-xs font-medium text-gray-700">{fmt(o.amount)}</p>
+                      <p className={`text-xs font-medium ${isPast ? "text-gray-400" : "text-gray-700"}`}>{fmt(o.amount)}</p>
                     )}
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </Card>
