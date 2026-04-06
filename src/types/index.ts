@@ -185,8 +185,10 @@ export interface OptimizedTaxResult {
   totalNet: number;
   effectiveRate: number;
   stazasMonths: number;
-  vatWarning: boolean; // civil contract exceeds 45k threshold
-  remainingInMB: number; // profit not yet withdrawn
+  vatWarning: boolean;
+  remainingInMB: number;
+  pelnoMokestis: number; // corporate profit tax on undistributed profit
+  pelnoMokestisRate: number; // 0% first year, 5% small company, 15% standard
 }
 
 export interface ObligationStep {

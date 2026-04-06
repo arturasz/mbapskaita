@@ -43,9 +43,11 @@ export function CalculatorPage() {
     setDividendsEnabled(plan.dividendsEnabled);
     setWithdrawAll(plan.withdrawAll);
     if (plan.withdrawalTarget > 0) setWithdrawalTarget(String(plan.withdrawalTarget));
+    if (settings.activityStartDate) setActivityStartDate(settings.activityStartDate);
   }, [loaded]);
 
   const rates = taxRatesByYear[year];
+  const [activityStartDate, setActivityStartDate] = useState(settings.activityStartDate ?? "");
 
   const [sodraSelfEnabled, setSodraSelfEnabled] = useState(plan.sodraSelfEnabled);
   const [sodraSelfBase, setSodraSelfBase] = useState("");
@@ -100,13 +102,16 @@ export function CalculatorPage() {
       withdrawalTarget: Number(withdrawalTarget) || 0,
     };
 
-    return calculateOptimizedTax(fakeIncome, fakeExpense, year, plan);
+    return calculateOptimizedTax(fakeIncome, fakeExpense, year, plan, {
+      activityStartDate: activityStartDate || undefined,
+    });
   }, [
     income,
     expenseAmount,
     year,
     sodraSelfEnabled,
     sodraSelfBase,
+    activityStartDate,
     civilContractEnabled,
     civilContractAnnual,
     dividendsEnabled,
@@ -120,7 +125,7 @@ export function CalculatorPage() {
 
       {/* Income & expenses */}
       <Card>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Metai</span>
             <select
@@ -156,6 +161,18 @@ export function CalculatorPage() {
               placeholder="pvz. 5000"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Veiklos pradžia</span>
+            <input
+              type="date"
+              value={activityStartDate}
+              onChange={(e) => setActivityStartDate(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            {activityStartDate && year === new Date(activityStartDate).getFullYear() && (
+              <span className="mt-1 text-xs text-green-600">Pirmi metai — pelno mokestis 0%</span>
+            )}
           </label>
         </div>
       </Card>
@@ -193,7 +210,7 @@ export function CalculatorPage() {
           )}
           {!withdrawAll && result && result.remainingInMB > 0 && (
             <p className="ml-6 text-sm text-gray-500">
-              MB liks: {fmt(result.remainingInMB)} (neapmokestinama kol neišimta)
+              MB liks: {fmt(result.remainingInMB)} (pelno mokestis: {(result.pelnoMokestisRate * 100).toFixed(0)}%{result.pelnoMokestisRate === 0 ? " — pirmi metai" : ""})
             </p>
           )}
         </div>
@@ -344,7 +361,12 @@ export function CalculatorPage() {
           {/* Remaining in MB warning */}
           {result.remainingInMB > 0 && (
             <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
-              MB lieka neisimta: {fmt(result.remainingInMB)}
+              <p>MB lieka neišimta: {fmt(result.remainingInMB)}</p>
+              <p className="mt-1">
+                Pelno mokestis: {fmt(result.pelnoMokestis)}
+                {" "}({(result.pelnoMokestisRate * 100).toFixed(0)}%
+                {result.pelnoMokestisRate === 0 ? " — pirmi metai, 0%" : result.pelnoMokestisRate === 0.05 ? " — maža įmonė" : ""})
+              </p>
             </div>
           )}
 

@@ -71,8 +71,10 @@ export function DashboardPage() {
   }, [incomes, year, settings.plannedMonthlyIncome]);
 
   const result = useMemo(
-    () => calculateOptimizedTax(projectedIncomes, expenses, year, settings.withdrawalPlan),
-    [projectedIncomes, expenses, year, settings.withdrawalPlan],
+    () => calculateOptimizedTax(projectedIncomes, expenses, year, settings.withdrawalPlan, {
+      activityStartDate: settings.activityStartDate,
+    }),
+    [projectedIncomes, expenses, year, settings.withdrawalPlan, settings.activityStartDate],
   );
 
   const actualIncome = useMemo(
@@ -172,6 +174,20 @@ export function DashboardPage() {
               <dt className="text-sm text-gray-600">Darbdavio Sodra</dt>
               <dd className="text-sm font-medium">{fmt(result.totalEmployerSodra)}</dd>
             </div>
+            {result.pelnoMokestis > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-sm text-gray-600">
+                Pelno mokestis ({(result.pelnoMokestisRate * 100).toFixed(0)}%)
+              </dt>
+              <dd className="text-sm font-medium">{fmt(result.pelnoMokestis)}</dd>
+            </div>
+            )}
+            {result.pelnoMokestisRate === 0 && result.remainingInMB > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-sm text-green-600">Pelno mokestis (0% — pirmi metai)</dt>
+              <dd className="text-sm font-medium text-green-600">{fmt(0)}</dd>
+            </div>
+            )}
             <div className="flex justify-between border-t pt-3">
               <dt className="text-sm font-semibold text-gray-900">Viso mokesčių</dt>
               <dd className="text-sm font-semibold">{fmt(result.totalTax)}</dd>

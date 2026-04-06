@@ -28,11 +28,16 @@ function r2(n: number): number {
  *   (min MMA). This gives stažas regardless of withdrawal method.
  *   Sodra cost is separate from withdrawal — it's a personal obligation.
  */
+export interface OptimizerOptions {
+  activityStartDate?: string;
+}
+
 export function calculateOptimizedTax(
   incomes: Income[],
   expenses: Expense[],
   year: number,
   plan: WithdrawalPlan,
+  options?: OptimizerOptions,
 ): OptimizedTaxResult {
   const rates = getTaxRates(year);
 
@@ -148,6 +153,15 @@ export function calculateOptimizedTax(
     .filter((w) => w.method === "civilContract")
     .reduce((s, w) => s + w.amount, 0);
 
+  const remainingInMB = r2(mbProfit - targetWithdrawal + remaining);
+
+  // Pelno mokestis on undistributed profit
+  // First tax year: 0%, small company (< 300k, < 10 employees): 5%, standard: 15%
+  const pelnoMokestisRate = getPelnoMokestisRate(year, totalIncome, options?.activityStartDate);
+  const pelnoMokestis = r2(Math.max(0, remainingInMB) * pelnoMokestisRate);
+
+  const totalTaxWithPM = r2(totalTax + pelnoMokestis);
+
   return {
     year,
     totalIncome: r2(totalIncome),
@@ -158,13 +172,35 @@ export function calculateOptimizedTax(
     totalVsd,
     totalPsd,
     totalEmployerSodra,
-    totalTax,
-    totalNet,
-    effectiveRate: targetWithdrawal > 0 ? r2(totalTax / targetWithdrawal) : 0,
+    totalTax: totalTaxWithPM,
+    totalNet: r2(totalNet - pelnoMokestis),
+    effectiveRate: targetWithdrawal > 0 ? r2(totalTaxWithPM / mbProfit) : 0,
     stazasMonths,
     vatWarning: civilContractTotal > rates.vatThreshold,
-    remainingInMB: r2(mbProfit - targetWithdrawal + remaining),
+    remainingInMB,
+    pelnoMokestis,
+    pelnoMokestisRate,
   };
+}
+
+/**
+ * Determine pelno mokestis rate for MB.
+ * - First tax year (from activityStartDate): 0%
+ * - Small company (revenue < 300k, < 10 employees): 5%
+ * - Standard: 15%
+ */
+function getPelnoMokestisRate(
+  year: number,
+  annualRevenue: number,
+  activityStartDate?: string,
+): number {
+  if (activityStartDate) {
+    const startYear = new Date(activityStartDate).getFullYear();
+    if (year === startYear) return 0;
+  }
+  // Small company: revenue < 300k and < 10 employees (MB sole member = 1)
+  if (annualRevenue < 300000) return 0.05;
+  return 0.15;
 }
 
 /**
