@@ -56,62 +56,63 @@ export function calculateOptimizedTax(
     : Math.min(plan.withdrawalTarget, mbProfit);
 
   const withdrawals: WithdrawalBreakdown[] = [];
-  let remaining = targetWithdrawal;
 
-  // 1. Civil contract (civilinė sutartis)
+  // --- Step 1: Civil contract (MB expense — reduces MB profit) ---
+  let civilContractAmount = 0;
   if (plan.civilContractEnabled && plan.civilContractAnnual > 0) {
-    const amount = Math.min(plan.civilContractAnnual, remaining);
-    const vsd = r2(Math.min(amount, rates.sodraCeiling) * rates.vsd);
-    const psd = r2(amount * rates.psd);
-    const gpmBase = Math.max(0, amount - vsd - psd);
+    civilContractAmount = Math.min(plan.civilContractAnnual, targetWithdrawal, mbProfit);
+    const vsd = r2(Math.min(civilContractAmount, rates.sodraCeiling) * rates.vsd);
+    const psd = r2(civilContractAmount * rates.psd);
+    const gpmBase = Math.max(0, civilContractAmount - vsd - psd);
     const gpm = r2(gpmBase * rates.gpm);
     const totalTax = r2(gpm + vsd + psd);
-
-    const stazas = r2(Math.min(12, (amount / 12) / rates.minMonthlyWage * 12));
+    const stazas = r2(Math.min(12, (civilContractAmount / 12) / rates.minMonthlyWage * 12));
 
     withdrawals.push({
       method: "civilContract",
       label: "Civilinė sutartis",
-      amount,
+      amount: civilContractAmount,
       gpm,
       gpmRate: rates.gpm,
       vsd,
       psd,
       employerSodra: 0,
       totalTax,
-      netAmount: r2(amount - totalTax),
+      netAmount: r2(civilContractAmount - totalTax),
       stazasMonths: Math.min(12, stazas),
     });
-
-    remaining = r2(remaining - amount);
   }
 
-  // 2. Dividends (pelno išėmimas) — gets the rest
-  if (plan.dividendsEnabled && remaining > 0) {
-    const amount = remaining;
-    const gpm = r2(amount * rates.gpmDividends);
-    const totalTax = r2(gpm);
+  // --- Step 2: Pelno mokestis (on MB profit AFTER civil contract expense) ---
+  // Civil contract payments are MB expenses → reduce taxable profit
+  const mbTaxableProfit = Math.max(0, mbProfit - civilContractAmount);
+  const pelnoMokestisRate = getPelnoMokestisRate(year, totalIncome, options?.activityStartDate);
+  const pelnoMokestis = r2(mbTaxableProfit * pelnoMokestisRate);
+  const afterTaxProfit = r2(mbTaxableProfit - pelnoMokestis);
+
+  // --- Step 3: Dividends (from after-tax profit only) ---
+  const wantedDividends = Math.max(0, targetWithdrawal - civilContractAmount);
+  const availableDividends = Math.min(wantedDividends, afterTaxProfit);
+
+  if (plan.dividendsEnabled && availableDividends > 0) {
+    const gpm = r2(availableDividends * rates.gpmDividends);
 
     withdrawals.push({
       method: "dividends",
-      label: "Pelno išėmimas",
-      amount,
+      label: "Pelno išėmimas (dividendai)",
+      amount: availableDividends,
       gpm,
       gpmRate: rates.gpmDividends,
       vsd: 0,
       psd: 0,
       employerSodra: 0,
-      totalTax,
-      netAmount: r2(amount - totalTax),
+      totalTax: gpm,
+      netAmount: r2(availableDividends - gpm),
       stazasMonths: 0,
     });
-
-    remaining = 0;
   }
 
-  // 3. Independent Sodra for stažas (savarankiškai dirbantis asmuo)
-  // This is NOT a withdrawal method — it's a personal Sodra contribution
-  // that gives stažas. The cost comes from personal funds (net income).
+  // --- Step 4: Independent Sodra for stažas ---
   let sodraSelfVsd = 0;
   let sodraSelfPsd = 0;
   let sodraSelfStazas = 0;
@@ -124,15 +125,12 @@ export function calculateOptimizedTax(
     const monthlyBase = plan.sodraSelfBase > 0
       ? Math.max(plan.sodraSelfBase, rates.minMonthlyWage)
       : rates.minMonthlyWage;
-    // Only pay Sodra for months not already covered by civil contract stažas
     const monthsNeeded = Math.max(0, 12 - Math.floor(civilContractStazas));
 
     sodraSelfVsd = r2(Math.min(monthlyBase * monthsNeeded, rates.sodraCeiling) * rates.vsd);
     sodraSelfPsd = r2(monthlyBase * monthsNeeded * rates.psd);
     sodraSelfStazas = r2(Math.min(monthsNeeded, monthsNeeded * monthlyBase / rates.minMonthlyWage));
   } else {
-    // Mandatory PSD from MMA even without voluntary Sodra
-    // (every resident must have PSD coverage)
     const hasPsdFromCivilContract = withdrawals.some(
       (w) => w.method === "civilContract" && w.psd > 0,
     );
@@ -141,26 +139,18 @@ export function calculateOptimizedTax(
     }
   }
 
+  // --- Totals ---
   const totalGpm = r2(withdrawals.reduce((s, w) => s + w.gpm, 0));
   const totalVsd = r2(withdrawals.reduce((s, w) => s + w.vsd, 0) + sodraSelfVsd);
   const totalPsd = r2(withdrawals.reduce((s, w) => s + w.psd, 0) + sodraSelfPsd);
-  const totalEmployerSodra = 0; // no employer Sodra for MB sole member
-  const totalTax = r2(totalGpm + totalVsd + totalPsd);
-  const totalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0) - sodraSelfVsd - sodraSelfPsd);
+  const totalEmployerSodra = 0;
+  const totalTax = r2(totalGpm + totalVsd + totalPsd + pelnoMokestis);
+  const withdrawalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0));
+  const totalNet = r2(withdrawalNet - sodraSelfVsd - sodraSelfPsd);
   const stazasMonths = Math.min(12, r2(civilContractStazas + sodraSelfStazas));
 
-  const civilContractTotal = withdrawals
-    .filter((w) => w.method === "civilContract")
-    .reduce((s, w) => s + w.amount, 0);
-
-  const remainingInMB = r2(mbProfit - targetWithdrawal + remaining);
-
-  // Pelno mokestis on undistributed profit
-  // First tax year: 0%, small company (< 300k, < 10 employees): 5%, standard: 15%
-  const pelnoMokestisRate = getPelnoMokestisRate(year, totalIncome, options?.activityStartDate);
-  const pelnoMokestis = r2(Math.max(0, remainingInMB) * pelnoMokestisRate);
-
-  const totalTaxWithPM = r2(totalTax + pelnoMokestis);
+  const totalWithdrawn = r2(civilContractAmount + availableDividends);
+  const remainingInMB = r2(afterTaxProfit - availableDividends);
 
   return {
     year,
@@ -172,11 +162,11 @@ export function calculateOptimizedTax(
     totalVsd,
     totalPsd,
     totalEmployerSodra,
-    totalTax: totalTaxWithPM,
-    totalNet: r2(totalNet - pelnoMokestis),
-    effectiveRate: targetWithdrawal > 0 ? r2(totalTaxWithPM / mbProfit) : 0,
+    totalTax,
+    totalNet,
+    effectiveRate: totalWithdrawn > 0 ? r2(totalTax / totalWithdrawn) : 0,
     stazasMonths,
-    vatWarning: civilContractTotal > rates.vatThreshold,
+    vatWarning: civilContractAmount > rates.vatThreshold,
     remainingInMB,
     pelnoMokestis,
     pelnoMokestisRate,
