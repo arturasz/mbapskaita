@@ -230,10 +230,13 @@ export function calculateMonthlySodraFromPlan(
 
     // Lėšos asmeniniams poreikiams: monthly Sodra
     if (plan.memberWithdrawalEnabled) {
-      // Estimate: assume even distribution across 12 months
-      // Actual amount depends on profit, but this gives indicative monthly
-      const estimatedMonthlyBase = rates.minMonthlyWage; // conservative: at least MMA
-      vsdBase = estimatedMonthlyBase * rates.sodraMemberBasePercent;
+      // Monthly withdrawal amount that gives full stažas:
+      // withdrawal * sodraMemberBasePercent >= MMA → withdrawal >= MMA / basePercent
+      const minMonthlyWithdrawal = Math.ceil(rates.minMonthlyWage / rates.sodraMemberBasePercent);
+      const monthlyWithdrawal = plan.memberWithdrawalAnnual > 0
+        ? plan.memberWithdrawalAnnual / 12
+        : minMonthlyWithdrawal;
+      vsdBase = r2(monthlyWithdrawal * rates.sodraMemberBasePercent);
       vsd = r2(Math.min(vsdBase, rates.sodraCeiling / 12) * rates.vsdMember);
       psd = r2(vsdBase * rates.psd);
     }
