@@ -165,7 +165,7 @@ export function SettingsPage() {
                   />
                   <span className="text-sm text-gray-500">EUR/metus</span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">0 = visas likutis. Min. pilnam stažui: nurodykite optimizatoriuje.</p>
+                <p className="mt-1 text-xs text-gray-500">Tuščia = automatiškai tiek kiek reikia pilnam stažui. Likutis eina kaip dividendai.</p>
               </label>
             )}
           </div>

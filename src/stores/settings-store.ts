@@ -16,7 +16,8 @@ const defaultSettings: Settings = {
     civilContractEnabled: false,
     civilContractAnnual: 0,
     memberWithdrawalEnabled: true,
-    memberWithdrawalAnnual: 0, // 0 = visas likutis
+    memberWithdrawalAnnual: 0, // 0 = auto (min pilnam stažui)
+    dividendsEnabled: true,
     withdrawAll: true,
     withdrawalTarget: 0,
   },

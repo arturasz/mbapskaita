@@ -149,8 +149,9 @@ export interface FilingDeadline {
 export interface WithdrawalPlan {
   civilContractEnabled: boolean;
   civilContractAnnual: number;
-  memberWithdrawalEnabled: boolean; // lėšos asmeniniams poreikiams (code 02)
-  memberWithdrawalAnnual: number; // 0 = visas likutis po pelno mokesčio
+  memberWithdrawalEnabled: boolean; // lėšos asmeniniams poreikiams (code 02) — stažui
+  memberWithdrawalAnnual: number; // kiek per metus (rekomenduojama: min pilnam stažui)
+  dividendsEnabled: boolean; // pelno paskirstymas — tik GPM 15%, be Sodros
   withdrawAll: boolean;
   withdrawalTarget: number;
 }
@@ -185,7 +186,7 @@ export interface AnnualTaxSummary {
 }
 
 export interface WithdrawalBreakdown {
-  method: "civilContract" | "memberWithdrawal";
+  method: "civilContract" | "memberWithdrawal" | "dividends";
   label: string;
   amount: number;
   gpm: number;

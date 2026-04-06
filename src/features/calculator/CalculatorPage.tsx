@@ -93,6 +93,7 @@ export function CalculatorPage() {
     const plan: WithdrawalPlan = {
       memberWithdrawalEnabled,
       memberWithdrawalAnnual: memberWithdrawalEnabled ? Number(memberWithdrawalAnnual) || 0 : 0,
+      dividendsEnabled: true,
       civilContractEnabled,
       civilContractAnnual: civilContractEnabled ? Number(civilContractAnnual) || 0 : 0,
       withdrawAll,
@@ -244,7 +245,7 @@ export function CalculatorPage() {
                   className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
                 <span className="mt-1 block text-xs text-gray-500">
-                  0 arba tuščia = visas likutis. Min. pilnam stažui: {fmt(Math.ceil(rates.minMonthlyWage / rates.sodraMemberBasePercent * 12))}
+                  Pilnam stažui užtenka ~{fmt(Math.ceil(rates.minMonthlyWage / rates.sodraMemberBasePercent * 12))}. Tuščia = automatiškai tiek.
                 </span>
               </label>
             )}

@@ -95,39 +95,59 @@ export function calculateOptimizedTax(
   const pelnoMokestis = r2(mbTaxableProfit * pelnoMokestisRate);
   const afterTaxProfit = r2(mbTaxableProfit - pelnoMokestis);
 
-  // --- Step 3: Lėšos asmeniniams poreikiams (code 02) ---
+  // --- Step 3: Lėšos asmeniniams poreikiams (code 02) — for stažas ---
+  let code02Amount = 0;
   if (plan.memberWithdrawalEnabled && afterTaxProfit > 0) {
-    // Amount: explicit if set, otherwise all remaining after-tax profit
+    // If amount specified, use it. If 0, auto-calculate minimum for full stažas.
+    const minForStazas = r2(Math.ceil(rates.minMonthlyWage / rates.sodraMemberBasePercent) * 12);
     const requested = plan.memberWithdrawalAnnual > 0
       ? plan.memberWithdrawalAnnual
-      : afterTaxProfit;
-    const amount = Math.min(requested, afterTaxProfit);
-    if (amount > 0) {
-      // Sodra base = amount × sodraMemberBasePercent (50% or 90%)
-      const sodraBase = r2(amount * rates.sodraMemberBasePercent);
+      : minForStazas;
+    code02Amount = Math.min(requested, afterTaxProfit);
+
+    if (code02Amount > 0) {
+      const sodraBase = r2(code02Amount * rates.sodraMemberBasePercent);
       const vsd = r2(Math.min(sodraBase, rates.sodraCeiling) * rates.vsdMember);
       const psd = r2(sodraBase * rates.psd);
-      const gpm = r2(amount * rates.gpmDividends); // flat 15%
+      const gpm = r2(code02Amount * rates.gpmDividends);
       const totalTax = r2(gpm + vsd + psd);
-
-      // Stažas: proportional to monthly Sodra base vs MMA
       const monthlySodraBase = sodraBase / 12;
       const stazas = r2(Math.min(12, (monthlySodraBase / rates.minMonthlyWage) * 12));
 
       withdrawals.push({
         method: "memberWithdrawal",
         label: "Lėšos asmeniniams poreikiams (code 02)",
-        amount,
+        amount: code02Amount,
         gpm,
         gpmRate: rates.gpmDividends,
         vsd,
         psd,
         employerSodra: 0,
         totalTax,
-        netAmount: r2(amount - totalTax),
+        netAmount: r2(code02Amount - totalTax),
         stazasMonths: Math.min(12, stazas),
       });
     }
+  }
+
+  // --- Step 4: Dividendai (pelno paskirstymas) — rest of after-tax profit ---
+  const remainingAfterCode02 = r2(afterTaxProfit - code02Amount);
+  if (plan.dividendsEnabled && remainingAfterCode02 > 0) {
+    const gpm = r2(remainingAfterCode02 * rates.gpmDividends);
+
+    withdrawals.push({
+      method: "dividends",
+      label: "Dividendai (pelno paskirstymas)",
+      amount: remainingAfterCode02,
+      gpm,
+      gpmRate: rates.gpmDividends,
+      vsd: 0,
+      psd: 0,
+      employerSodra: 0,
+      totalTax: gpm,
+      netAmount: r2(remainingAfterCode02 - gpm),
+      stazasMonths: 0,
+    });
   }
 
   // --- Totals ---
@@ -140,8 +160,7 @@ export function calculateOptimizedTax(
   const stazasMonths = Math.min(12, r2(withdrawals.reduce((s, w) => s + w.stazasMonths, 0)));
 
   const totalWithdrawn = r2(withdrawals.reduce((s, w) => s + w.amount, 0));
-  const remainingInMB = r2(afterTaxProfit -
-    withdrawals.filter((w) => w.method === "memberWithdrawal").reduce((s, w) => s + w.amount, 0));
+  const remainingInMB = r2(afterTaxProfit - code02Amount - (plan.dividendsEnabled ? remainingAfterCode02 : 0));
 
   // Mandatory PSD from MMA if no Sodra at all
   let mandatoryPsd = 0;
