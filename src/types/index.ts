@@ -18,16 +18,6 @@ export type Quarter = 1 | 2 | 3 | 4;
 
 export type VATScheme = "standard" | "margin" | "exempt";
 
-/**
- * How the MB member receives income:
- * - civil_contract: works under civilinė sutartis with the MB.
- *   Sodra (VSD+PSD) calculated on actual payments received.
- * - profit_withdrawal: withdraws profit (pelno išėmimas).
- *   Only GPM 15% on withdrawn amount. No mandatory Sodra from MB,
- *   but member can pay voluntary Sodra for stažas.
- */
-export type MBIncomeMode = "civil_contract" | "profit_withdrawal";
-
 // --- Core records ---
 
 export type IncomeSourceCountry = "LT" | "US" | "GB" | "DE" | "Other";
@@ -89,10 +79,12 @@ export interface Investment {
 
 export interface TaxRates {
   year: number;
-  gpm: number; // GPM rate (e.g. 0.15)
-  gpmDividends: number; // GPM on dividends
+  gpm: number; // GPM rate for civil contract / dividends (0.15)
+  gpmEmployment: number; // GPM rate for employment salary (0.20)
+  gpmDividends: number; // GPM on dividends (0.15)
   vsd: number; // VSD (pension) rate
   psd: number; // PSD (health) rate
+  employerSodra: number; // employer Sodra contribution rate
   vatStandard: number; // standard VAT rate
   vatReduced: number; // reduced VAT rate
   vatThreshold: number; // annual EUR threshold for mandatory VAT registration
@@ -109,6 +101,23 @@ export interface FilingDeadline {
   recurring: "monthly" | "quarterly" | "annual";
 }
 
+// --- Withdrawal plan ---
+
+/**
+ * How the MB member withdraws money. Multiple can be enabled.
+ *
+ * - salary: darbo sutartis — GPM 20%, full Sodra (employee+employer), stažas
+ * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD, stažas, but watch 45k VAT
+ * - dividends: pelno išėmimas — GPM 15%, no Sodra (except mandatory PSD from MMA)
+ */
+export interface WithdrawalPlan {
+  salaryEnabled: boolean; // darbo sutartis (alga)
+  salaryMonthly: number; // monthly gross salary amount
+  civilContractEnabled: boolean; // civilinė sutartis
+  civilContractAnnual: number; // annual civil contract amount
+  dividendsEnabled: boolean; // pelno išėmimas / dividendai
+}
+
 // --- App state ---
 
 export interface Settings {
@@ -118,9 +127,8 @@ export interface Settings {
   fiscalYear: number;
   memberName: string;
   mbName: string;
-  activityStartDate?: string; // ISO date — veiklos pradžia (Sodra lengvatos pirmus 2 m.)
-  incomeMode: MBIncomeMode;
-  voluntarySodra: boolean; // for profit_withdrawal: pay voluntary Sodra for stažas?
+  activityStartDate?: string;
+  withdrawalPlan: WithdrawalPlan;
 }
 
 // --- Tax calculation results ---
@@ -138,6 +146,47 @@ export interface AnnualTaxSummary {
   netIncome: number;
 }
 
+export interface WithdrawalBreakdown {
+  method: "salary" | "civilContract" | "dividends";
+  label: string;
+  amount: number;
+  gpm: number;
+  gpmRate: number;
+  vsd: number;
+  psd: number;
+  employerSodra: number;
+  totalTax: number;
+  netAmount: number;
+  stazasMonths: number;
+}
+
+export interface OptimizedTaxResult {
+  year: number;
+  totalIncome: number;
+  totalExpenses: number;
+  mbProfit: number; // income - expenses
+  withdrawals: WithdrawalBreakdown[];
+  totalGpm: number;
+  totalVsd: number;
+  totalPsd: number;
+  totalEmployerSodra: number;
+  totalTax: number;
+  totalNet: number;
+  effectiveRate: number;
+  stazasMonths: number;
+  vatWarning: boolean; // civil contract exceeds 45k threshold
+  remainingInMB: number; // profit not yet withdrawn
+}
+
+export interface Obligation {
+  name: string;
+  description: string;
+  dueDate: string; // ISO date
+  amount?: number;
+  recurring: "monthly" | "quarterly" | "annual" | "once";
+  category: "sodra" | "gpm" | "vat" | "declaration" | "other";
+}
+
 export interface QuarterlyVATSummary {
   year: number;
   quarter: Quarter;
@@ -152,10 +201,11 @@ export interface MonthlySodra {
   month: number; // 1-12
   vsdAmount: number;
   psdAmount: number;
+  employerSodra: number;
   total: number;
-  cumulative: number; // year-to-date total
-  stazasMonths: number; // pension qualifying months earned this month (0-1)
-  stazasCumulative: number; // year-to-date stažas
+  cumulative: number;
+  stazasMonths: number;
+  stazasCumulative: number;
 }
 
 export interface QuarterlyGPM {
@@ -164,7 +214,7 @@ export interface QuarterlyGPM {
   expensesYTD: number;
   taxableYTD: number;
   gpmYTD: number;
-  gpmAdvance: number; // this quarter's advance payment
+  gpmAdvance: number;
   previousAdvances: number;
 }
 

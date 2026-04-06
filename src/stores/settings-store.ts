@@ -11,8 +11,13 @@ const defaultSettings: Settings = {
   fiscalYear: new Date().getFullYear(),
   memberName: "",
   mbName: "",
-  incomeMode: "civil_contract",
-  voluntarySodra: false,
+  withdrawalPlan: {
+    salaryEnabled: false,
+    salaryMonthly: 0,
+    civilContractEnabled: true,
+    civilContractAnnual: 0,
+    dividendsEnabled: true,
+  },
 };
 
 interface SettingsStore {
@@ -28,7 +33,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   hydrate: async () => {
     const data = await storage.get<Settings>(STORAGE_KEY);
-    set({ settings: data ?? defaultSettings, loaded: true });
+    // Merge with defaults to handle missing fields from older stored data
+    set({ settings: data ? { ...defaultSettings, ...data } : defaultSettings, loaded: true });
   },
 
   update: async (partial) => {

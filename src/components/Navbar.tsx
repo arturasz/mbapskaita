@@ -5,7 +5,7 @@ const links = [
   { to: "/income", label: "Pajamos" },
   { to: "/expenses", label: "Išlaidos" },
   { to: "/vat", label: "PVM" },
-  { to: "/calculator", label: "Skaičiuoklė" },
+  { to: "/calculator", label: "Optimizatorius" },
   { to: "/investments", label: "Investicijos" },
   { to: "/guides", label: "Gidai" },
   { to: "/settings", label: "Nustatymai" },

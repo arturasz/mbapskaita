@@ -12,7 +12,7 @@ import {
   exportFullBackup,
   importFullBackup,
 } from "../../lib/export";
-import type { Currency, VATScheme, MBIncomeMode } from "../../types";
+import type { Currency, VATScheme, WithdrawalPlan } from "../../types";
 
 const availableYears = Object.keys(taxRatesByYear).map(Number);
 
@@ -57,7 +57,13 @@ export function SettingsPage() {
     if (restoreRef.current) restoreRef.current.value = "";
   };
 
+  const handlePlanChange = (changes: Partial<WithdrawalPlan>) => {
+    handleChange({ withdrawalPlan: { ...settings.withdrawalPlan, ...changes } });
+  };
+
   if (!loaded) return <p className="text-gray-500">Kraunama...</p>;
+
+  const plan = settings.withdrawalPlan;
 
   return (
     <div className="space-y-6">
@@ -100,36 +106,6 @@ export function SettingsPage() {
             </span>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">Pajamų gavimo būdas</span>
-            <select
-              value={settings.incomeMode}
-              onChange={(e) => handleChange({ incomeMode: e.target.value as MBIncomeMode })}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="civil_contract">Civilinė sutartis (Sodra nuo išmokų)</option>
-              <option value="profit_withdrawal">Pelno išėmimas (tik GPM)</option>
-            </select>
-            <span className="mt-1 text-xs text-gray-500">
-              {settings.incomeMode === "civil_contract"
-                ? "VSD+PSD skaičiuojama nuo faktinių išmokų"
-                : "Tik GPM 15%. Sodra savanoriška (stažui rinkti)."}
-            </span>
-          </label>
-          {settings.incomeMode === "profit_withdrawal" && (
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={settings.voluntarySodra}
-                onChange={(e) => handleChange({ voluntarySodra: e.target.checked })}
-                className="rounded border-gray-300"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Savanoriška Sodra (stažui)</span>
-                <p className="text-xs text-gray-500">Mokėti VSD+PSD nuo MMA bazės stažui kaupti</p>
-              </div>
-            </label>
-          )}
-          <label className="block">
             <span className="text-sm font-medium text-gray-700">Fiskaliniai metai</span>
             <select
               value={settings.fiscalYear}
@@ -141,6 +117,97 @@ export function SettingsPage() {
               ))}
             </select>
           </label>
+        </div>
+      </Card>
+
+      <Card title="Pajamų išėmimo planas">
+        <div className="space-y-5">
+          {/* Salary (darbo sutartis) */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={plan.salaryEnabled}
+                onChange={(e) => handlePlanChange({ salaryEnabled: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Darbo sutartis (alga)</span>
+                <p className="text-xs text-gray-500">GPM 20%, pilna Sodra (darbuotojo + darbdavio), stažo kaupimas</p>
+              </div>
+            </label>
+            {plan.salaryEnabled && (
+              <label className="ml-9 block">
+                <span className="text-sm text-gray-600">Mėnesinis bruto atlyginimas</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    value={plan.salaryMonthly || ""}
+                    onChange={(e) => handlePlanChange({ salaryMonthly: Number(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <span className="text-sm text-gray-500">EUR/men.</span>
+                </div>
+              </label>
+            )}
+          </div>
+
+          {/* Civil contract (civilinė sutartis) */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={plan.civilContractEnabled}
+                onChange={(e) => handlePlanChange({ civilContractEnabled: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Civilinė sutartis</span>
+                <p className="text-xs text-gray-500">GPM 15%, VSD+PSD, stažo kaupimas</p>
+              </div>
+            </label>
+            {plan.civilContractEnabled && (
+              <label className="ml-9 block">
+                <span className="text-sm text-gray-600">Metinė suma</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={plan.civilContractAnnual || ""}
+                    onChange={(e) => handlePlanChange({ civilContractAnnual: Number(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <span className="text-sm text-gray-500">EUR/metus</span>
+                </div>
+                {plan.civilContractAnnual > 45000 && (
+                  <p className="mt-1 text-sm font-medium text-amber-600">
+                    Perspėjimas: civilinės sutarties suma viršija 45 000 EUR — gali tekti registruotis PVM mokėtoju.
+                  </p>
+                )}
+              </label>
+            )}
+          </div>
+
+          {/* Dividends (pelno išėmimas) */}
+          <div>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={plan.dividendsEnabled}
+                onChange={(e) => handlePlanChange({ dividendsEnabled: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Pelno išėmimas (dividendai)</span>
+                <p className="text-xs text-gray-500">GPM 15%, be Sodros (tik privaloma PSD nuo MMA jei nėra kitų šaltinių)</p>
+              </div>
+            </label>
+          </div>
         </div>
       </Card>
 

@@ -5,10 +5,13 @@ import type {
   MonthlySodra,
   QuarterlyGPM,
   Quarter,
-  MBIncomeMode,
 } from "../types";
 import { getTaxRates } from "../data/tax-rates";
 
+/** @deprecated Use WithdrawalPlan + optimizer instead. */
+type MBIncomeMode = "civil_contract" | "profit_withdrawal";
+
+/** @deprecated Use calculateOptimizedTax from optimizer.ts instead. */
 export interface TaxOptions {
   activityStartDate?: string;
   incomeMode?: MBIncomeMode;
@@ -192,7 +195,7 @@ export function calculateMonthlySodra(
       : 0;
     stazasCum = round2(stazasCum + stazasMonths);
 
-    months.push({ month: m, vsdAmount, psdAmount, total, cumulative, stazasMonths, stazasCumulative: stazasCum });
+    months.push({ month: m, vsdAmount, psdAmount, employerSodra: 0, total, cumulative, stazasMonths, stazasCumulative: stazasCum });
   }
 
   return months;
