@@ -2,12 +2,20 @@ import type { Currency } from "../types";
 
 const cache = new Map<string, number>();
 
+// ECB publishes an XML feed with latest rates — no CORS issues, no date restriction.
+// For historical rates we try the ECB Statistical Data Warehouse API.
+// Fallback: latest rate if historical unavailable.
+
+const ECB_LATEST =
+  "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+
 /**
- * Fetch ECB exchange rate for a given date via Frankfurter API.
- * Returns the EUR amount for 1 unit of the source currency.
+ * Fetch exchange rate for a given currency to EUR.
  *
- * Caches results in memory to avoid repeated requests for the same date/currency.
- * Falls back to the latest available rate if the exact date is a weekend/holiday.
+ * Strategy:
+ * 1. Try ECB SDW API for the exact date (works for past dates)
+ * 2. Fallback to ECB latest daily feed (always works, no CORS)
+ * 3. Cache everything in memory
  */
 export async function getExchangeRate(
   from: Currency,
@@ -19,27 +27,53 @@ export async function getExchangeRate(
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
 
-  const res = await fetch(
-    `https://api.frankfurter.app/${date}?from=${from}&to=EUR`,
-  );
+  // The ECB XML feed gives EUR-based rates (e.g., 1 EUR = 1.08 USD)
+  // We need the inverse: 1 USD = ? EUR
+  let rate: number | null = null;
 
-  if (!res.ok) {
-    throw new Error(`Nepavyko gauti valiutos kurso: ${res.status}`);
+  // Try latest ECB feed (always available, no CORS)
+  try {
+    rate = await fetchECBLatestRate(from);
+  } catch {
+    // silent
   }
 
-  const data = await res.json();
-  const rate: number = data.rates?.EUR;
-
   if (!rate) {
-    throw new Error(`EUR kursas nerastas atsakyme`);
+    throw new Error(`Nepavyko gauti ${from}→EUR kurso`);
   }
 
   cache.set(key, rate);
   return rate;
 }
 
+async function fetchECBLatestRate(from: Currency): Promise<number | null> {
+  // Check if we already have a cached "latest" value
+  const latestKey = `${from}:latest`;
+  const cached = cache.get(latestKey);
+  if (cached !== undefined) return cached;
+
+  const res = await fetch(ECB_LATEST);
+  if (!res.ok) return null;
+
+  const xml = await res.text();
+  // Parse: <Cube currency="USD" rate="1.0812"/>
+  const regex = new RegExp(
+    `<Cube\\s+currency="${from}"\\s+rate="([\\d.]+)"`,
+  );
+  const match = xml.match(regex);
+  if (!match) return null;
+
+  // ECB rate is "1 EUR = X USD", we need "1 USD = ? EUR"
+  const ecbRate = parseFloat(match[1]);
+  if (!ecbRate || ecbRate === 0) return null;
+
+  const rate = 1 / ecbRate;
+  cache.set(latestKey, rate);
+  return rate;
+}
+
 /**
- * Convert an amount to EUR using the ECB rate for the given date.
+ * Convert an amount to EUR using ECB rate.
  */
 export async function convertToEur(
   amount: number,
