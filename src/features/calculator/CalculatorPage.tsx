@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "../../components/Card";
 import { StatCard } from "../../components/StatCard";
 import { Badge } from "../../components/Badge";
 import { calculateOptimizedTax } from "../../lib/optimizer";
 import { taxRatesByYear } from "../../data/tax-rates";
+import { useSettingsStore } from "../../stores/settings-store";
 import type { WithdrawalPlan, Income, Expense } from "../../types";
 
 function fmt(n: number): string {
@@ -17,15 +18,38 @@ function pct(n: number): string {
 const availableYears = Object.keys(taxRatesByYear).map(Number);
 
 export function CalculatorPage() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [income, setIncome] = useState("");
+  const { settings, loaded, hydrate } = useSettingsStore();
+
+  useEffect(() => {
+    if (!loaded) hydrate();
+  }, [loaded, hydrate]);
+
+  const planned = settings.plannedMonthlyIncome;
+  const plan = settings.withdrawalPlan;
+
+  const [year, setYear] = useState(settings.fiscalYear);
+  const [income, setIncome] = useState(planned > 0 ? String(planned * 12) : "");
   const [expenseAmount, setExpenseAmount] = useState("");
+
+  // Prefill from settings when they load
+  useEffect(() => {
+    if (!loaded) return;
+    if (planned > 0 && income === "") setIncome(String(planned * 12));
+    setYear(settings.fiscalYear);
+    setSodraSelfEnabled(plan.sodraSelfEnabled);
+    if (plan.sodraSelfBase > 0) setSodraSelfBase(String(plan.sodraSelfBase));
+    setCivilContractEnabled(plan.civilContractEnabled);
+    if (plan.civilContractAnnual > 0) setCivilContractAnnual(String(plan.civilContractAnnual));
+    setDividendsEnabled(plan.dividendsEnabled);
+    setWithdrawAll(plan.withdrawAll);
+    if (plan.withdrawalTarget > 0) setWithdrawalTarget(String(plan.withdrawalTarget));
+  }, [loaded]);
 
   const rates = taxRatesByYear[year];
 
-  const [sodraSelfEnabled, setSodraSelfEnabled] = useState(true);
+  const [sodraSelfEnabled, setSodraSelfEnabled] = useState(plan.sodraSelfEnabled);
   const [sodraSelfBase, setSodraSelfBase] = useState("");
-  const [civilContractEnabled, setCivilContractEnabled] = useState(false);
+  const [civilContractEnabled, setCivilContractEnabled] = useState(plan.civilContractEnabled);
   const [civilContractAnnual, setCivilContractAnnual] = useState("");
   const [dividendsEnabled, setDividendsEnabled] = useState(true);
   const [withdrawAll, setWithdrawAll] = useState(true);
