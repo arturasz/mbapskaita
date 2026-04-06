@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Card } from "../../components/Card";
 import { Table } from "../../components/Table";
 import { Badge } from "../../components/Badge";
-import { FileImport } from "../../components/FileImport";
+import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useIncomeStore } from "../../stores/income-store";
+import type { ImportResult } from "../../stores/income-store";
 import { parseDeelCSV } from "../../lib/import-deel";
+import { parseDeelPDF } from "../../lib/import-deel-pdf";
 import { convertToEur } from "../../lib/currency";
 import type { Income, Currency, IncomeCategory, IncomeSourceCountry } from "../../types";
 
@@ -45,10 +47,13 @@ function incomeToForm(income: Income): FormState {
 }
 
 export function IncomePage() {
-  const { incomes, loaded, hydrate, add, update, remove } = useIncomeStore();
+  const { incomes, loaded, hydrate, add, importBatch, update, remove } =
+    useIncomeStore();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     if (!loaded) hydrate();
@@ -60,9 +65,6 @@ export function IncomePage() {
     setShowForm(true);
   };
 
-  const [importCount, setImportCount] = useState<number | null>(null);
-  const [converting, setConverting] = useState(false);
-
   const autoConvert = useCallback(
     async (amount: string, currency: Currency, date: string) => {
       if (currency === "EUR" || !amount || !date) return;
@@ -71,7 +73,7 @@ export function IncomePage() {
         const eur = await convertToEur(Number(amount), currency, date);
         setForm((f) => ({ ...f, amountEur: String(eur) }));
       } catch {
-        // silent — user can fill manually
+        // silent
       } finally {
         setConverting(false);
       }
@@ -79,17 +81,35 @@ export function IncomePage() {
     [],
   );
 
-  const handleDeelImport = async (csvText: string) => {
-    try {
-      const parsed = await parseDeelCSV(csvText);
-      for (const income of parsed) {
-        await add(income);
+  const showResult = (result: ImportResult, source: string) => {
+    const parts = [`${source}: pridėta ${result.added}`];
+    if (result.skipped > 0) parts.push(`praleista ${result.skipped} (dublikatai)`);
+    setImportStatus(parts.join(", "));
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
+  const handleDeelFiles = async (files: File[]) => {
+    const allIncomes: Income[] = [];
+
+    for (const file of files) {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        const income = await parseDeelPDF(file);
+        if (income) allIncomes.push(income);
+      } else {
+        const text = await file.text();
+        const parsed = await parseDeelCSV(text);
+        allIncomes.push(...parsed);
       }
-      setImportCount(parsed.length);
-      setTimeout(() => setImportCount(null), 4000);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Importavimo klaida");
     }
+
+    if (allIncomes.length === 0) {
+      setImportStatus("Nepavyko rasti pajamų duomenų failuose");
+      setTimeout(() => setImportStatus(null), 4000);
+      return;
+    }
+
+    const result = await importBatch(allIncomes);
+    showResult(result, `Deel (${files.length} failų)`);
   };
 
   const cancelForm = () => {
@@ -124,8 +144,9 @@ export function IncomePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Pajamos</h1>
-        <div className="flex items-center gap-3">
-          <FileImport label="Importuoti iš Deel" onImport={handleDeelImport} />
+        <div className="flex flex-wrap items-center gap-3">
+          <FileImport label="Deel failai" onFiles={handleDeelFiles} />
+          <DirectoryImport label="Deel katalogas" onFiles={handleDeelFiles} />
           <button
             onClick={() => (showForm ? cancelForm() : setShowForm(true))}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -135,9 +156,9 @@ export function IncomePage() {
         </div>
       </div>
 
-      {importCount !== null && (
+      {importStatus && (
         <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">
-          Importuota {importCount} įrašų iš Deel
+          {importStatus}
         </div>
       )}
 

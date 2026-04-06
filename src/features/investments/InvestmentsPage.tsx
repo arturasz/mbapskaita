@@ -2,11 +2,13 @@ import { useEffect, useState, useMemo } from "react";
 import { Card } from "../../components/Card";
 import { Table } from "../../components/Table";
 import { StatCard } from "../../components/StatCard";
-import { FileImport } from "../../components/FileImport";
+import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useInvestmentStore } from "../../stores/investment-store";
+import type { ImportResult } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { calculateInvestmentGains, totalInvestmentTax } from "../../lib/investments";
 import { parseIBKRActivityStatement } from "../../lib/import-ibkr";
+import { parseIBKRPDF } from "../../lib/import-ibkr-pdf";
 import type { Investment, Currency } from "../../types";
 
 function fmt(n: number): string {
@@ -27,7 +29,7 @@ const emptyForm = {
 };
 
 export function InvestmentsPage() {
-  const { investments, loaded, hydrate, add, remove } = useInvestmentStore();
+  const { investments, loaded, hydrate, add, importBatch, remove } = useInvestmentStore();
   const { settings, loaded: sl, hydrate: hs } = useSettingsStore();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -44,19 +46,37 @@ export function InvestmentsPage() {
   );
   const tax = useMemo(() => totalInvestmentTax(gains), [gains]);
 
-  const [importCount, setImportCount] = useState<number | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  const handleIBKRImport = async (csvText: string) => {
-    try {
-      const parsed = await parseIBKRActivityStatement(csvText);
-      for (const inv of parsed) {
-        await add(inv);
+  const showResult = (result: ImportResult, source: string) => {
+    const parts = [`${source}: pridėta ${result.added}`];
+    if (result.skipped > 0) parts.push(`praleista ${result.skipped} (dublikatai)`);
+    setImportStatus(parts.join(", "));
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
+  const handleIBKRFiles = async (files: File[]) => {
+    const allInvestments: Investment[] = [];
+
+    for (const file of files) {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        const parsed = await parseIBKRPDF(file);
+        allInvestments.push(...parsed);
+      } else {
+        const text = await file.text();
+        const parsed = await parseIBKRActivityStatement(text);
+        allInvestments.push(...parsed);
       }
-      setImportCount(parsed.length);
-      setTimeout(() => setImportCount(null), 4000);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Importavimo klaida");
     }
+
+    if (allInvestments.length === 0) {
+      setImportStatus("Nepavyko rasti sandorių failuose");
+      setTimeout(() => setImportStatus(null), 4000);
+      return;
+    }
+
+    const result = await importBatch(allInvestments);
+    showResult(result, `IBKR (${files.length} failų)`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,8 +112,9 @@ export function InvestmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Investicijos ({year})</h1>
-        <div className="flex items-center gap-3">
-          <FileImport label="Importuoti iš IBKR" onImport={handleIBKRImport} />
+        <div className="flex flex-wrap items-center gap-3">
+          <FileImport label="IBKR failai" onFiles={handleIBKRFiles} />
+          <DirectoryImport label="IBKR katalogas" onFiles={handleIBKRFiles} />
           <button
             onClick={() => setShowForm(!showForm)}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -103,9 +124,9 @@ export function InvestmentsPage() {
         </div>
       </div>
 
-      {importCount !== null && (
+      {importStatus && (
         <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">
-          Importuota {importCount} sandorių iš IBKR
+          {importStatus}
         </div>
       )}
 
