@@ -36,11 +36,9 @@ export function CalculatorPage() {
     if (!loaded) return;
     if (planned > 0 && income === "") setIncome(String(planned * 12));
     setYear(settings.fiscalYear);
-    setSodraSelfEnabled(plan.sodraSelfEnabled);
-    if (plan.sodraSelfBase > 0) setSodraSelfBase(String(plan.sodraSelfBase));
+    setMemberWithdrawalEnabled(plan.memberWithdrawalEnabled);
     setCivilContractEnabled(plan.civilContractEnabled);
     if (plan.civilContractAnnual > 0) setCivilContractAnnual(String(plan.civilContractAnnual));
-    setDividendsEnabled(plan.dividendsEnabled);
     setWithdrawAll(plan.withdrawAll);
     if (plan.withdrawalTarget > 0) setWithdrawalTarget(String(plan.withdrawalTarget));
     if (settings.activityStartDate) setActivityStartDate(settings.activityStartDate);
@@ -49,11 +47,9 @@ export function CalculatorPage() {
   const rates = taxRatesByYear[year];
   const [activityStartDate, setActivityStartDate] = useState(settings.activityStartDate ?? "");
 
-  const [sodraSelfEnabled, setSodraSelfEnabled] = useState(plan.sodraSelfEnabled);
-  const [sodraSelfBase, setSodraSelfBase] = useState("");
+  const [memberWithdrawalEnabled, setMemberWithdrawalEnabled] = useState(plan.memberWithdrawalEnabled);
   const [civilContractEnabled, setCivilContractEnabled] = useState(plan.civilContractEnabled);
   const [civilContractAnnual, setCivilContractAnnual] = useState("");
-  const [dividendsEnabled, setDividendsEnabled] = useState(true);
   const [withdrawAll, setWithdrawAll] = useState(true);
   const [withdrawalTarget, setWithdrawalTarget] = useState("");
 
@@ -93,11 +89,9 @@ export function CalculatorPage() {
         : [];
 
     const plan: WithdrawalPlan = {
-      sodraSelfEnabled,
-      sodraSelfBase: sodraSelfEnabled ? Number(sodraSelfBase) || 0 : 0,
+      memberWithdrawalEnabled,
       civilContractEnabled,
       civilContractAnnual: civilContractEnabled ? Number(civilContractAnnual) || 0 : 0,
-      dividendsEnabled,
       withdrawAll,
       withdrawalTarget: Number(withdrawalTarget) || 0,
     };
@@ -109,12 +103,10 @@ export function CalculatorPage() {
     income,
     expenseAmount,
     year,
-    sodraSelfEnabled,
-    sodraSelfBase,
+    memberWithdrawalEnabled,
     activityStartDate,
     civilContractEnabled,
     civilContractAnnual,
-    dividendsEnabled,
     withdrawAll,
     withdrawalTarget,
   ]);
@@ -219,44 +211,23 @@ export function CalculatorPage() {
       {/* Withdrawal methods */}
       <Card title="Isemimo budai">
         <div className="space-y-4">
-          {/* Sodra stažui */}
+          {/* Lėšos asmeniniams poreikiams */}
           <div className="rounded-md border border-gray-200 p-4">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={sodraSelfEnabled}
-                onChange={(e) => setSodraSelfEnabled(e.target.checked)}
+                checked={memberWithdrawalEnabled}
+                onChange={(e) => setMemberWithdrawalEnabled(e.target.checked)}
                 className="rounded border-gray-300"
               />
               <span className="text-sm font-medium text-gray-900">
-                Sodra stažui (savarankiškai)
+                Lėšos asmeniniams poreikiams (code 02)
               </span>
-              <Badge variant="success">Stažas</Badge>
+              <Badge variant="success">Stažas + Sodra</Badge>
             </label>
             <p className="mt-1 ml-6 text-xs text-gray-500">
-              GPM netaikomas, VSD+PSD nuo pasirinktos bazės (min MMA), stažo kaupimas
+              GPM 15%, VSD 13.83% + PSD 6.98% nuo bazės. Stažo kaupimas.
             </p>
-            {sodraSelfEnabled && (
-              <label className="mt-3 block">
-                <span className="text-sm text-gray-600">
-                  Mėnesinė Sodra bazė (EUR)
-                </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={sodraSelfBase}
-                  onChange={(e) => setSodraSelfBase(e.target.value)}
-                  placeholder={String(rates?.minMonthlyWage ?? 0)}
-                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-                <span className="mt-1 block text-xs text-gray-500">
-                  0 arba tuščia = MMA ({fmt(rates?.minMonthlyWage ?? 0)})
-                </span>
-                <span className="mt-1 block text-xs text-gray-500">
-                  Registruojatės Sodroje kaip savarankiškai dirbantis. Galima derinti su bet kuriuo išėmimo būdu.
-                </span>
-              </label>
-            )}
           </div>
 
           {/* Civil contract */}
@@ -298,29 +269,6 @@ export function CalculatorPage() {
             )}
           </div>
 
-          {/* Dividends */}
-          <div className="rounded-md border border-gray-200 p-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={dividendsEnabled}
-                onChange={(e) => setDividendsEnabled(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm font-medium text-gray-900">
-                Pelno isemimas (dividendai)
-              </span>
-              <Badge variant="info">GPM 15%</Badge>
-            </label>
-            {dividendsEnabled && (
-              <p className="mt-2 text-sm text-gray-500">
-                Gauna likusia suma automatiskai
-                {result &&
-                  result.withdrawals.find((w) => w.method === "dividends") &&
-                  `: ${fmt(result.withdrawals.find((w) => w.method === "dividends")!.amount)}`}
-              </p>
-            )}
-          </div>
         </div>
       </Card>
 

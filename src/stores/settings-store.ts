@@ -15,9 +15,7 @@ const defaultSettings: Settings = {
   withdrawalPlan: {
     civilContractEnabled: false,
     civilContractAnnual: 0,
-    dividendsEnabled: true,
-    sodraSelfEnabled: true,
-    sodraSelfBase: 0, // 0 = use MMA
+    memberWithdrawalEnabled: true, // lėšos asmeniniams poreikiams (code 02)
     withdrawAll: true,
     withdrawalTarget: 0,
   },

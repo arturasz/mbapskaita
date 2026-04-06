@@ -7,26 +7,35 @@ import type {
   Obligation,
   MonthlySodra,
 } from "../types";
-import { getTaxRates } from "../data/tax-rates";
+import { getTaxRates, calculateProgressiveGPM } from "../data/tax-rates";
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
 /**
- * Calculate optimized tax breakdown for an MB sole member.
+ * Optimized tax calculation for MB sole member.
  *
- * MB sole member/director CANNOT have darbo sutartis with their own MB.
+ * Two withdrawal methods (can combine):
  *
- * Available methods:
- * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD from payments, stažas.
- *   Watch 45k EUR VAT threshold.
- * - dividends: pelno išėmimas — GPM 15%, no Sodra.
+ * 1. Civilinė sutartis (code 77) — MB expense, reduces MB profit.
+ *    - GPM: 15% flat (2024-2025), progressive 15-32% (2026+)
+ *    - VSD: 0%, PSD: 0% — NO Sodra, no stažas
+ *    - Source: https://sodra.lt/imokos/esu-mazosios-bendrijos-narys
  *
- * Independent Sodra option:
- * - sodraSelf: register as self-employed with Sodra, pay VSD+PSD from chosen base
- *   (min MMA). This gives stažas regardless of withdrawal method.
- *   Sodra cost is separate from withdrawal — it's a personal obligation.
+ * 2. Lėšos asmeniniams poreikiams (code 02) — from after-tax MB profit.
+ *    - GPM: 15% flat
+ *    - VSD: 13.83% on (amount × sodraMemberBasePercent)
+ *    - PSD: 6.98% on (amount × sodraMemberBasePercent)
+ *    - sodraMemberBasePercent: 50% (2024-2025), 90% from 2026-07-01
+ *    - Gives stažas
+ *    - Source: https://smapskaita.lt/mb-nario-mokesciai-2026-metais/
+ *
+ * Flow:
+ * 1. Civil contract = MB expense → reduces MB taxable profit
+ * 2. Pelno mokestis on remaining MB profit
+ * 3. After-tax profit available for lėšos asmeniniams poreikiams
+ * 4. Member withdrawal triggers GPM + VSD + PSD
  */
 export interface OptimizerOptions {
   activityStartDate?: string;
@@ -51,106 +60,94 @@ export function calculateOptimizedTax(
 
   const mbProfit = Math.max(0, totalIncome - totalExpenses);
 
-  const targetWithdrawal = plan.withdrawAll
-    ? mbProfit
-    : Math.min(plan.withdrawalTarget, mbProfit);
-
   const withdrawals: WithdrawalBreakdown[] = [];
 
-  // --- Step 1: Civil contract (MB expense — reduces MB profit) ---
+  // --- Step 1: Civil contract (code 77) — MB expense ---
   let civilContractAmount = 0;
   if (plan.civilContractEnabled && plan.civilContractAnnual > 0) {
-    civilContractAmount = Math.min(plan.civilContractAnnual, targetWithdrawal, mbProfit);
-    const vsd = r2(Math.min(civilContractAmount, rates.sodraCeiling) * rates.vsd);
-    const psd = r2(civilContractAmount * rates.psd);
-    const gpmBase = Math.max(0, civilContractAmount - vsd - psd);
-    const gpm = r2(gpmBase * rates.gpm);
-    const totalTax = r2(gpm + vsd + psd);
-    const stazas = r2(Math.min(12, (civilContractAmount / 12) / rates.minMonthlyWage * 12));
+    civilContractAmount = Math.min(plan.civilContractAnnual, mbProfit);
+
+    // GPM: flat 15% (2024-2025) or progressive (2026+)
+    const gpm = calculateProgressiveGPM(civilContractAmount, rates);
+    // No Sodra on civil contract
+    const totalTax = gpm;
 
     withdrawals.push({
       method: "civilContract",
-      label: "Civilinė sutartis",
+      label: "Civilinė sutartis (code 77)",
       amount: civilContractAmount,
       gpm,
-      gpmRate: rates.gpm,
-      vsd,
-      psd,
-      employerSodra: 0,
-      totalTax,
-      netAmount: r2(civilContractAmount - totalTax),
-      stazasMonths: Math.min(12, stazas),
-    });
-  }
-
-  // --- Step 2: Pelno mokestis (on MB profit AFTER civil contract expense) ---
-  // Civil contract payments are MB expenses → reduce taxable profit
-  const mbTaxableProfit = Math.max(0, mbProfit - civilContractAmount);
-  const pelnoMokestisRate = getPelnoMokestisRate(year, totalIncome, options?.activityStartDate);
-  const pelnoMokestis = r2(mbTaxableProfit * pelnoMokestisRate);
-  const afterTaxProfit = r2(mbTaxableProfit - pelnoMokestis);
-
-  // --- Step 3: Dividends (from after-tax profit only) ---
-  const wantedDividends = Math.max(0, targetWithdrawal - civilContractAmount);
-  const availableDividends = Math.min(wantedDividends, afterTaxProfit);
-
-  if (plan.dividendsEnabled && availableDividends > 0) {
-    const gpm = r2(availableDividends * rates.gpmDividends);
-
-    withdrawals.push({
-      method: "dividends",
-      label: "Pelno išėmimas (dividendai)",
-      amount: availableDividends,
-      gpm,
-      gpmRate: rates.gpmDividends,
+      gpmRate: rates.gpmCivilContract,
       vsd: 0,
       psd: 0,
       employerSodra: 0,
-      totalTax: gpm,
-      netAmount: r2(availableDividends - gpm),
-      stazasMonths: 0,
+      totalTax,
+      netAmount: r2(civilContractAmount - totalTax),
+      stazasMonths: 0, // no stažas from civil contract
     });
   }
 
-  // --- Step 4: Independent Sodra for stažas ---
-  let sodraSelfVsd = 0;
-  let sodraSelfPsd = 0;
-  let sodraSelfStazas = 0;
+  // --- Step 2: Pelno mokestis ---
+  const mbTaxableProfit = Math.max(0, mbProfit - civilContractAmount);
+  const pelnoMokestisRate = getPelnoMokestisRate(
+    year, totalIncome, rates, options?.activityStartDate,
+  );
+  const pelnoMokestis = r2(mbTaxableProfit * pelnoMokestisRate);
+  const afterTaxProfit = r2(mbTaxableProfit - pelnoMokestis);
 
-  const civilContractStazas = withdrawals
-    .filter((w) => w.method === "civilContract")
-    .reduce((s, w) => s + w.stazasMonths, 0);
+  // --- Step 3: Lėšos asmeniniams poreikiams (code 02) ---
+  if (plan.memberWithdrawalEnabled && afterTaxProfit > 0) {
+    const targetWithdrawal = plan.withdrawAll
+      ? afterTaxProfit
+      : Math.min(Math.max(0, plan.withdrawalTarget - civilContractAmount), afterTaxProfit);
 
-  if (plan.sodraSelfEnabled) {
-    const monthlyBase = plan.sodraSelfBase > 0
-      ? Math.max(plan.sodraSelfBase, rates.minMonthlyWage)
-      : rates.minMonthlyWage;
-    const monthsNeeded = Math.max(0, 12 - Math.floor(civilContractStazas));
+    const amount = targetWithdrawal;
+    if (amount > 0) {
+      // Sodra base = amount × sodraMemberBasePercent (50% or 90%)
+      const sodraBase = r2(amount * rates.sodraMemberBasePercent);
+      const vsd = r2(Math.min(sodraBase, rates.sodraCeiling) * rates.vsdMember);
+      const psd = r2(sodraBase * rates.psd);
+      const gpm = r2(amount * rates.gpmDividends); // flat 15%
+      const totalTax = r2(gpm + vsd + psd);
 
-    sodraSelfVsd = r2(Math.min(monthlyBase * monthsNeeded, rates.sodraCeiling) * rates.vsd);
-    sodraSelfPsd = r2(monthlyBase * monthsNeeded * rates.psd);
-    sodraSelfStazas = r2(Math.min(monthsNeeded, monthsNeeded * monthlyBase / rates.minMonthlyWage));
-  } else {
-    const hasPsdFromCivilContract = withdrawals.some(
-      (w) => w.method === "civilContract" && w.psd > 0,
-    );
-    if (!hasPsdFromCivilContract) {
-      sodraSelfPsd = r2(rates.minMonthlyWage * 12 * rates.psd);
+      // Stažas: proportional to monthly Sodra base vs MMA
+      const monthlySodraBase = sodraBase / 12;
+      const stazas = r2(Math.min(12, (monthlySodraBase / rates.minMonthlyWage) * 12));
+
+      withdrawals.push({
+        method: "memberWithdrawal",
+        label: "Lėšos asmeniniams poreikiams (code 02)",
+        amount,
+        gpm,
+        gpmRate: rates.gpmDividends,
+        vsd,
+        psd,
+        employerSodra: 0,
+        totalTax,
+        netAmount: r2(amount - totalTax),
+        stazasMonths: Math.min(12, stazas),
+      });
     }
   }
 
   // --- Totals ---
   const totalGpm = r2(withdrawals.reduce((s, w) => s + w.gpm, 0));
-  const totalVsd = r2(withdrawals.reduce((s, w) => s + w.vsd, 0) + sodraSelfVsd);
-  const totalPsd = r2(withdrawals.reduce((s, w) => s + w.psd, 0) + sodraSelfPsd);
+  const totalVsd = r2(withdrawals.reduce((s, w) => s + w.vsd, 0));
+  const totalPsd = r2(withdrawals.reduce((s, w) => s + w.psd, 0));
   const totalEmployerSodra = 0;
   const totalTax = r2(totalGpm + totalVsd + totalPsd + pelnoMokestis);
-  const withdrawalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0));
-  const totalNet = r2(withdrawalNet - sodraSelfVsd - sodraSelfPsd);
-  const stazasMonths = Math.min(12, r2(civilContractStazas + sodraSelfStazas));
+  const totalNet = r2(withdrawals.reduce((s, w) => s + w.netAmount, 0));
+  const stazasMonths = Math.min(12, r2(withdrawals.reduce((s, w) => s + w.stazasMonths, 0)));
 
-  const totalWithdrawn = r2(civilContractAmount + availableDividends);
-  const remainingInMB = r2(afterTaxProfit - availableDividends);
+  const totalWithdrawn = r2(withdrawals.reduce((s, w) => s + w.amount, 0));
+  const remainingInMB = r2(afterTaxProfit -
+    withdrawals.filter((w) => w.method === "memberWithdrawal").reduce((s, w) => s + w.amount, 0));
+
+  // Mandatory PSD from MMA if no Sodra at all
+  let mandatoryPsd = 0;
+  if (totalVsd === 0 && totalPsd === 0) {
+    mandatoryPsd = r2(rates.minMonthlyWage * 12 * rates.psd);
+  }
 
   return {
     year,
@@ -160,11 +157,11 @@ export function calculateOptimizedTax(
     withdrawals,
     totalGpm,
     totalVsd,
-    totalPsd,
+    totalPsd: r2(totalPsd + mandatoryPsd),
     totalEmployerSodra,
-    totalTax,
-    totalNet,
-    effectiveRate: totalWithdrawn > 0 ? r2(totalTax / totalWithdrawn) : 0,
+    totalTax: r2(totalTax + mandatoryPsd),
+    totalNet: r2(totalNet - mandatoryPsd),
+    effectiveRate: totalWithdrawn > 0 ? r2((totalTax + mandatoryPsd) / totalWithdrawn) : 0,
     stazasMonths,
     vatWarning: civilContractAmount > rates.vatThreshold,
     remainingInMB,
@@ -174,27 +171,29 @@ export function calculateOptimizedTax(
 }
 
 /**
- * Determine pelno mokestis rate for MB.
- * - First tax year (from activityStartDate): 0%
- * - Small company (revenue < 300k, < 10 employees): 5%
- * - Standard: 15%
+ * Pelno mokestis rate.
+ * Sources:
+ * - https://www.vmi.lt/evmi/pelno-mokescio-pakeitimai-nuo-2026-m.
+ * - https://versloerdve.lt/blog/verslo-pradzia-2026-0-pelno-mokestis-2-metai/
  */
 function getPelnoMokestisRate(
   year: number,
   annualRevenue: number,
+  rates: ReturnType<typeof getTaxRates>,
   activityStartDate?: string,
 ): number {
+  // First N years at 0%
   if (activityStartDate) {
     const startYear = new Date(activityStartDate).getFullYear();
-    if (year === startYear) return 0;
+    if (year < startYear + rates.pelnoMokestisFirstYearCount) return rates.pelnoMokestisFirstYears;
   }
-  // Small company: revenue < 300k and < 10 employees (MB sole member = 1)
-  if (annualRevenue < 300000) return 0.05;
-  return 0.15;
+  // Small company: revenue < 300k (employee limit abolished from 2026)
+  if (annualRevenue < 300000) return rates.pelnoMokestisSmall;
+  return rates.pelnoMokestisStandard;
 }
 
 /**
- * Generate monthly Sodra breakdown based on withdrawal plan.
+ * Monthly Sodra breakdown.
  */
 export function calculateMonthlySodraFromPlan(
   year: number,
@@ -210,37 +209,24 @@ export function calculateMonthlySodraFromPlan(
     let psd = 0;
     let vsdBase = 0;
 
-    // Civil contract Sodra
-    if (plan.civilContractEnabled && plan.civilContractAnnual > 0) {
-      const monthlyBase = plan.civilContractAnnual / 12;
-      vsdBase += monthlyBase;
-      vsd += r2(Math.min(monthlyBase, rates.sodraCeiling / 12) * rates.vsd);
-      psd += r2(monthlyBase * rates.psd);
+    // Lėšos asmeniniams poreikiams: monthly Sodra
+    if (plan.memberWithdrawalEnabled) {
+      // Estimate: assume even distribution across 12 months
+      // Actual amount depends on profit, but this gives indicative monthly
+      const estimatedMonthlyBase = rates.minMonthlyWage; // conservative: at least MMA
+      vsdBase = estimatedMonthlyBase * rates.sodraMemberBasePercent;
+      vsd = r2(Math.min(vsdBase, rates.sodraCeiling / 12) * rates.vsdMember);
+      psd = r2(vsdBase * rates.psd);
     }
 
-    // Independent Sodra for stažas
-    if (plan.sodraSelfEnabled) {
-      const base = plan.sodraSelfBase > 0
-        ? Math.max(plan.sodraSelfBase, rates.minMonthlyWage)
-        : rates.minMonthlyWage;
-      // Only add if civil contract doesn't already cover this month's stažas
-      if (vsdBase < rates.minMonthlyWage) {
-        const additional = base - vsdBase;
-        if (additional > 0) {
-          vsdBase += additional;
-          vsd += r2(Math.min(additional, rates.sodraCeiling / 12) * rates.vsd);
-          psd += r2(additional * rates.psd);
-        }
-      }
-    }
+    // Civil contract: no Sodra
+    // (vsd and psd stay 0 for civil contract)
 
     // Mandatory PSD if nothing else
-    if (vsd === 0 && psd === 0 && plan.dividendsEnabled) {
+    if (vsd === 0 && psd === 0) {
       psd = r2(rates.minMonthlyWage * rates.psd);
     }
 
-    vsd = r2(vsd);
-    psd = r2(psd);
     const total = r2(vsd + psd);
     cumulative = r2(cumulative + total);
 
@@ -265,7 +251,7 @@ export function calculateMonthlySodraFromPlan(
 }
 
 /**
- * Generate obligations timeline with step-by-step instructions.
+ * Obligations timeline with step-by-step instructions.
  */
 export function generateObligations(
   year: number,
@@ -273,221 +259,123 @@ export function generateObligations(
   result: OptimizedTaxResult,
 ): Obligation[] {
   const obligations: Obligation[] = [];
-  const hasSodra = plan.civilContractEnabled || plan.sodraSelfEnabled;
-  const monthlySodra = result.totalVsd + result.totalPsd;
-  const monthlySodraAmount = monthlySodra > 0 ? r2(monthlySodra / 12) : 0;
+  const hasMemberWithdrawal = plan.memberWithdrawalEnabled && result.totalVsd > 0;
 
-  // Monthly Sodra
-  if (hasSodra) {
+  // Monthly Sodra for member withdrawal (code 02)
+  if (hasMemberWithdrawal) {
+    const monthlySodra = r2((result.totalVsd + result.totalPsd) / 12);
     for (let m = 1; m <= 12; m++) {
       obligations.push({
-        name: "Sodra įmokos",
-        description: "VSD + PSD mėnesinės įmokos",
+        name: "Sodra įmokos (code 02)",
+        description: "VSD + PSD nuo lėšų asmeniniams poreikiams",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
-        amount: monthlySodraAmount,
+        amount: monthlySodra,
         recurring: "monthly",
         category: "sodra",
         steps: [
-          {
-            action: "Prisijunkite prie Sodra draudėjų portalo",
-            portal: "https://draudejai.sodra.lt",
-          },
-          {
-            action: "Patikrinkite apskaičiuotą įmokų sumą (arba apskaičiuokite pagal savo bazę)",
-          },
-          {
-            action: "Atlikite mokėjimą banku į Sodra sąskaitą",
-            account: "Gavėjas: Sodra. Įmokos kodas: nurodytas portale. Mokėkite iš MB arba asmeninės sąskaitos.",
-          },
-          {
-            action: "Įsitikinkite kad mokėjimas atliktas iki mėnesio 15 d.",
-          },
+          { action: "Prisijunkite prie Sodra draudėjų portalo", portal: "https://draudejai.sodra.lt" },
+          { action: "Patikrinkite apskaičiuotą VSD+PSD sumą" },
+          { action: "Atlikite mokėjimą į Sodra sąskaitą iki 15 d.", account: "Gavėjas: Sodra" },
         ],
       });
     }
   }
 
-  // Mandatory PSD even for dividends-only
-  if (!hasSodra && plan.dividendsEnabled) {
+  // Mandatory PSD even without member withdrawal
+  if (!hasMemberWithdrawal) {
     const rates = getTaxRates(year);
+    const monthlyPsd = r2(rates.minMonthlyWage * rates.psd);
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "PSD įmoka (privaloma)",
-        description: "Minimali PSD nuo MMA — privaloma net be Sodra registracijos",
+        description: "Minimali PSD nuo MMA",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
-        amount: r2(rates.minMonthlyWage * rates.psd),
+        amount: monthlyPsd,
         recurring: "monthly",
         category: "sodra",
         steps: [
-          {
-            action: "Prisijunkite prie Sodra portalo",
-            portal: "https://gyventojai.sodra.lt",
-          },
-          {
-            action: "Atlikite PSD mokėjimą banku",
-            account: "Gavėjas: Sodra. Tai privaloma sveikatos draudimo įmoka nuo MMA.",
-          },
+          { action: "Prisijunkite prie Sodra portalo", portal: "https://gyventojai.sodra.lt" },
+          { action: "Atlikite PSD mokėjimą", account: "Gavėjas: Sodra. Privaloma PSD nuo MMA." },
         ],
       });
     }
   }
 
-  // SAV reports
-  if (hasSodra) {
+  // SAV reports (if Sodra is paid)
+  if (hasMemberWithdrawal) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "SAV pranešimas",
-        description: "Sodra mėnesinis pranešimas apie apdraustųjų valstybinio socialinio draudimo įmokas",
+        description: "Sodra mėnesinis pranešimas",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         recurring: "monthly",
         category: "declaration",
         steps: [
-          {
-            action: "Prisijunkite prie Sodra draudėjų portalo",
-            portal: "https://draudejai.sodra.lt",
-          },
-          {
-            action: 'Eikite į "Pranešimai" \u2192 "SAV pranešimas"',
-          },
-          {
-            action: "Užpildykite: nurodykite VSD ir PSD bazę, draudimo laikotarpį",
-          },
-          {
-            action: "Pateikite pranešimą. Terminas — iki mėnesio 15 d.",
-          },
+          { action: "Prisijunkite prie Sodra draudėjų portalo", portal: "https://draudejai.sodra.lt" },
+          { action: 'Eikite "Pranešimai" \u2192 "SAV pranešimas"' },
+          { action: "Užpildykite VSD/PSD bazę ir laikotarpį, pateikite" },
         ],
       });
     }
   }
 
-  // GPM for civil contract
+  // GPM for civil contract (MB withholds)
   if (plan.civilContractEnabled) {
     for (let m = 1; m <= 12; m++) {
       obligations.push({
-        name: "GPM deklaravimas ir mokėjimas",
-        description: "Mėnesinis GPM nuo civilinės sutarties išmokų",
+        name: "GPM deklaracija (FR0572)",
+        description: "Mėnesinis GPM nuo civilinės sutarties",
         dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
         recurring: "monthly",
         category: "gpm",
         steps: [
-          {
-            action: "Prisijunkite prie VMI portalo (EDS)",
-            portal: "https://deklaravimas.vmi.lt",
-          },
-          {
-            action: "Pateikite FR0572 formą — mėnesinę GPM deklaraciją",
-            form: "FR0572",
-          },
-          {
-            action: "Nurodykite išmokėtą sumą pagal civilinę sutartį ir apskaičiuotą GPM (15%)",
-          },
-          {
-            action: "Perveskite GPM sumą į VMI biudžeto sąskaitą",
-            account: "Gavėjas: VMI. Mokėjimo kodas: 1001 (GPM). Mokėkite iš MB sąskaitos — MB yra mokesčio agentas.",
-          },
+          { action: "Prisijunkite prie VMI EDS", portal: "https://deklaravimas.vmi.lt" },
+          { action: "Pateikite FR0572 formą", form: "FR0572" },
+          { action: "Perveskite GPM į VMI", account: "Gavėjas: VMI. Mokėjimo kodas: 1001 (GPM). MB yra mokesčio agentas." },
         ],
       });
     }
-  }
-
-  // GPM for dividends (annual, not monthly)
-  if (plan.dividendsEnabled && !plan.civilContractEnabled) {
-    obligations.push({
-      name: "GPM nuo pelno išėmimo",
-      description: "GPM deklaravimas ir sumokėjimas nuo išimto pelno",
-      dueDate: `${year + 1}-05-01`,
-      amount: result.totalGpm,
-      recurring: "annual",
-      category: "gpm",
-      steps: [
-        {
-          action: "Deklaruokite pelno išėmimą metinėje GPM314 deklaracijoje",
-          portal: "https://deklaravimas.vmi.lt",
-          form: "GPM314",
-        },
-        {
-          action: "GPM nuo pelno išėmimo sumokamas kartu su metine deklaracija",
-          account: "Gavėjas: VMI. Mokėjimo kodas: 1001 (GPM).",
-        },
-      ],
-    });
   }
 
   // Annual GPM declaration
   obligations.push({
     name: "Metinė GPM deklaracija (GPM314)",
-    description: "Metinė pajamų mokesčio deklaracija — visos pajamos ir mokesčiai",
+    description: "Metinė pajamų deklaracija",
     dueDate: `${year + 1}-05-01`,
     recurring: "annual",
     category: "declaration",
     steps: [
-      {
-        action: "Prisijunkite prie VMI EDS sistemos",
-        portal: "https://deklaravimas.vmi.lt",
-      },
-      {
-        action: "Pildykite GPM314 formą",
-        form: "GPM314",
-      },
-      {
-        action: "Nurodykite visas metines pajamas: civilinės sutarties išmokas, pelno išėmimus, investicijų pajamas",
-      },
-      {
-        action: "Nurodykite sumokėtus mokesčius per metus (GPM, Sodra)",
-      },
-      {
-        action: "Pateikite deklaraciją. Jei yra GPM skirtumas — sumokėkite arba laukite grąžinimo.",
-        account: "Gavėjas: VMI. Mokėjimo kodas: 1001.",
-      },
+      { action: "Prisijunkite prie VMI EDS", portal: "https://deklaravimas.vmi.lt" },
+      { action: "Pildykite GPM314 formą — visos pajamos ir mokesčiai", form: "GPM314" },
+      { action: "Jei yra GPM skirtumas — sumokėkite arba laukite grąžinimo", account: "VMI, kodas 1001" },
     ],
   });
 
-  // Annual MB financial statements
+  // MB pelno mokestis
   obligations.push({
-    name: "MB finansinė atskaitomybė",
-    description: "Metiniai finansiniai dokumentai Registrų centrui",
+    name: "MB pelno mokesčio deklaracija (PLN204)",
+    description: `Pelno mokestis: ${(result.pelnoMokestisRate * 100).toFixed(0)}%${result.pelnoMokestisRate === 0 ? " (lengvata)" : ""}`,
+    dueDate: `${year + 1}-06-15`,
+    amount: result.pelnoMokestis > 0 ? result.pelnoMokestis : undefined,
+    recurring: "annual",
+    category: "declaration",
+    steps: [
+      { action: "Prisijunkite prie VMI EDS", portal: "https://deklaravimas.vmi.lt" },
+      { action: "Pildykite PLN204 formą", form: "PLN204" },
+      { action: `Tarifas: ${(result.pelnoMokestisRate * 100).toFixed(0)}%. Bazė: MB pelnas po civilinės sutarties sąnaudų.` },
+    ],
+  });
+
+  // Financial statements
+  obligations.push({
+    name: "Finansinė atskaitomybė",
+    description: "Metinė ataskaita Registrų centrui",
     dueDate: `${year + 1}-06-30`,
     recurring: "annual",
     category: "declaration",
     steps: [
-      {
-        action: "Paruoškite MB balanso ataskaitą ir pelno/nuostolių ataskaitą",
-      },
-      {
-        action: "Prisijunkite prie Registrų centro portalo",
-        portal: "https://jar.registrucentras.lt",
-      },
-      {
-        action: "Pateikite metinę finansinę ataskaitą elektroniniu būdu",
-      },
-      {
-        action: "Terminas — iki kitų metų birželio 30 d.",
-      },
-    ],
-  });
-
-  // Annual MB pelno mokestis declaration (if applicable)
-  obligations.push({
-    name: "MB pelno mokesčio deklaracija",
-    description: "PLN204 forma — MB pelno mokestis (0% jei pelnas neviršija 300k EUR ir < 10 darbuotojų)",
-    dueDate: `${year + 1}-06-15`,
-    recurring: "annual",
-    category: "declaration",
-    steps: [
-      {
-        action: "Prisijunkite prie VMI EDS",
-        portal: "https://deklaravimas.vmi.lt",
-      },
-      {
-        action: "Pildykite PLN204 formą (MB pelno mokesčio deklaracija)",
-        form: "PLN204",
-      },
-      {
-        action: "MB su pajamomis < 300 000 EUR ir < 10 darbuotojų — 0% pelno mokesčio tarifas",
-      },
-      {
-        action: "Pateikite deklaraciją iki birželio 15 d.",
-      },
+      { action: "Paruoškite MB balanso ir pelno/nuostolių ataskaitas" },
+      { action: "Pateikite per Registrų centro portalą", portal: "https://jar.registrucentras.lt" },
     ],
   });
 

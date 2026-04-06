@@ -77,20 +77,43 @@ export interface Investment {
 
 // --- Tax configuration ---
 
+export interface GPMBracket {
+  upTo: number;
+  rate: number;
+}
+
 export interface TaxRates {
   year: number;
-  gpm: number; // GPM rate for civil contract / dividends (0.15)
-  gpmEmployment: number; // GPM rate for employment salary (0.20)
-  gpmDividends: number; // GPM on dividends (0.15)
-  vsd: number; // VSD (pension) rate
-  psd: number; // PSD (health) rate
-  employerSodra: number; // employer Sodra contribution rate
-  vatStandard: number; // standard VAT rate
-  vatReduced: number; // reduced VAT rate
-  vatThreshold: number; // annual EUR threshold for mandatory VAT registration
-  minMonthlyWage: number; // MMA — minimum monthly wage
-  averageMonthlyWage: number; // VDU — average monthly wage
-  sodraCeiling: number; // Sodra contribution ceiling (VSD)
+
+  // GPM rates
+  gpmCivilContract: number; // base GPM for civilinė sutartis (code 77)
+  gpmDividends: number; // GPM on dividends / pelno išėmimas (flat 15%)
+  gpmEmployment: number; // GPM for employment (not applicable to MB sole member)
+  gpmProgressive: { brackets: GPMBracket[] } | null; // progressive GPM from 2026
+
+  // Sodra for MB member — lėšos asmeniniams poreikiams (code 02)
+  // Source: https://sodra.lt/imokos/esu-mazosios-bendrijos-narys
+  vsdMember: number; // VSD rate for MB member (13.83%)
+  psd: number; // PSD rate (6.98%)
+  sodraMemberBasePercent: number; // % of withdrawn amount as Sodra base (50% or 90%)
+
+  // Civilinė sutartis (code 77) — NO Sodra
+  vsdCivilContract: number; // 0%
+  psdCivilContract: number; // 0%
+
+  // Pelno mokestis (corporate income tax)
+  pelnoMokestisStandard: number;
+  pelnoMokestisSmall: number; // small company reduced rate
+  pelnoMokestisFirstYears: number; // 0% for first N years
+  pelnoMokestisFirstYearCount: number; // how many years at 0%
+
+  vatStandard: number;
+  vatReduced: number;
+  vatThreshold: number; // 45k EUR
+
+  minMonthlyWage: number; // MMA
+  averageMonthlyWage: number; // VDU (for Sodra calculations)
+  sodraCeiling: number; // 43 VDU for self-employed
 }
 
 export interface FilingDeadline {
@@ -111,19 +134,22 @@ export interface FilingDeadline {
  * - dividends: pelno išėmimas — GPM 15%, no Sodra (except mandatory PSD from MMA)
  */
 /**
- * MB sole member cannot have darbo sutartis with their own MB.
- * Available methods:
- * - civilContract: civilinė sutartis — GPM 15%, VSD+PSD from payments, stažas
- * - dividends: pelno išėmimas — GPM 15%, no Sodra
- * - sodraSelf: register with Sodra as self-employed, pay VSD+PSD for stažas
- *   (independent of withdrawal method — can combine with dividends)
+ * MB sole member withdrawal methods.
+ * Source: https://sodra.lt/imokos/esu-mazosios-bendrijos-narys
+ *
+ * - civilContract (code 77): civilinė sutartis — GPM applies (progressive from 2026),
+ *   NO VSD, NO PSD. Cheap but no stažas. This is an MB expense.
+ *
+ * - memberWithdrawal (code 02): lėšos asmeniniams poreikiams — GPM 15%,
+ *   VSD 13.83% + PSD 6.98% on 50% of amount (90% from 2026-07).
+ *   Gives stažas. Comes from after-tax profit.
+ *
+ * Both can be combined. MB sole member CANNOT have darbo sutartis.
  */
 export interface WithdrawalPlan {
   civilContractEnabled: boolean;
-  civilContractAnnual: number; // annual amount via civil contract
-  dividendsEnabled: boolean; // pelno išėmimas
-  sodraSelfEnabled: boolean; // pay Sodra independently for stažas
-  sodraSelfBase: number; // monthly base for voluntary Sodra (min MMA)
+  civilContractAnnual: number;
+  memberWithdrawalEnabled: boolean; // lėšos asmeniniams poreikiams (code 02)
   withdrawAll: boolean;
   withdrawalTarget: number;
 }
@@ -158,7 +184,7 @@ export interface AnnualTaxSummary {
 }
 
 export interface WithdrawalBreakdown {
-  method: "salary" | "civilContract" | "dividends";
+  method: "civilContract" | "memberWithdrawal";
   label: string;
   amount: number;
   gpm: number;

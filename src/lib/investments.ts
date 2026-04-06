@@ -22,7 +22,7 @@ export function calculateInvestmentGains(
     .map((inv) => {
       const gain = round2((inv.salePriceEur ?? 0) - inv.purchasePriceEur);
       const taxableGain = Math.max(0, gain);
-      const gpmOnGain = round2(taxableGain * rates.gpm);
+      const gpmOnGain = round2(taxableGain * rates.gpmDividends);
       const holdingPeriodDays = inv.saleDate
         ? Math.floor(
             (new Date(inv.saleDate).getTime() -

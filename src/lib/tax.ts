@@ -1,3 +1,7 @@
+/**
+ * @deprecated Legacy tax calculations. Use optimizer.ts instead.
+ * Kept for backward compatibility with existing tests.
+ */
 import type {
   AnnualTaxSummary,
   Income,
@@ -8,30 +12,14 @@ import type {
 } from "../types";
 import { getTaxRates } from "../data/tax-rates";
 
-/** @deprecated Use WithdrawalPlan + optimizer instead. */
 type MBIncomeMode = "civil_contract" | "profit_withdrawal";
 
-/** @deprecated Use calculateOptimizedTax from optimizer.ts instead. */
 export interface TaxOptions {
   activityStartDate?: string;
   incomeMode?: MBIncomeMode;
   voluntarySodra?: boolean;
 }
 
-/**
- * Calculate annual tax summary for an MB solo member.
- *
- * Two modes:
- *
- * 1. civil_contract — narys dirba pagal civilinę sutartį su MB.
- *    - Sodra (VSD+PSD) skaičiuojama nuo faktinių išmokų (taxableIncome).
- *    - GPM 15% nuo (taxableIncome - VSD - PSD).
- *
- * 2. profit_withdrawal — narys išsiima pelną (pelno išėmimas).
- *    - GPM 15% nuo išimto pelno.
- *    - Sodra neprivalo mokėti per MB.
- *    - Jei voluntarySodra = true, moka savanoriškai nuo MMA bazės (stažui rinkti).
- */
 export function calculateAnnualTax(
   incomes: Income[],
   expenses: Expense[],
@@ -56,9 +44,7 @@ export function calculateAnnualTax(
   let gpmAmount: number;
 
   if (mode === "civil_contract") {
-    // Sodra nuo faktinių išmokų
     const sodraBase = taxableIncome;
-
     const inDiscount = isInSodraDiscountPeriod(year, options?.activityStartDate);
     const mmaAnnualBase = rates.minMonthlyWage * 12;
 
@@ -67,28 +53,23 @@ export function calculateAnnualTax(
       : sodraBase;
     const cappedVsdBase = Math.min(vsdBase, rates.sodraCeiling);
 
-    vsdAmount = round2(cappedVsdBase * rates.vsd);
+    vsdAmount = round2(cappedVsdBase * rates.vsdMember);
     psdAmount = round2(sodraBase * rates.psd);
 
-    // GPM nuo (taxableIncome - Sodra)
     const gpmBase = Math.max(0, taxableIncome - vsdAmount - psdAmount);
-    gpmAmount = round2(gpmBase * rates.gpm);
+    gpmAmount = round2(gpmBase * rates.gpmCivilContract);
   } else {
-    // profit_withdrawal — tik GPM, Sodra savanoriška
     if (options?.voluntarySodra) {
-      // Savanoriška Sodra nuo MMA bazės — stažui rinkti
       const mmaAnnualBase = rates.minMonthlyWage * 12;
-      vsdAmount = round2(mmaAnnualBase * rates.vsd);
+      vsdAmount = round2(mmaAnnualBase * rates.vsdMember);
       psdAmount = round2(mmaAnnualBase * rates.psd);
     } else {
-      // PSD vis tiek privaloma (minimali), VSD ne
       const mmaAnnualBase = rates.minMonthlyWage * 12;
       vsdAmount = 0;
-      psdAmount = round2(mmaAnnualBase * rates.psd); // privaloma PSD nuo MMA
+      psdAmount = round2(mmaAnnualBase * rates.psd);
     }
 
-    // GPM nuo viso pelno (Sodra neatskaičiuojama iš bazės)
-    gpmAmount = round2(taxableIncome * rates.gpm);
+    gpmAmount = round2(taxableIncome * rates.gpmCivilContract);
   }
 
   const totalTax = round2(gpmAmount + vsdAmount + psdAmount);
@@ -109,9 +90,6 @@ export function calculateAnnualTax(
   };
 }
 
-/**
- * Check if a given tax year falls within the first 2 calendar years of activity.
- */
 export function isInSodraDiscountPeriod(
   year: number,
   activityStartDate?: string,
@@ -121,12 +99,6 @@ export function isInSodraDiscountPeriod(
   return year >= startYear && year < startYear + 2;
 }
 
-/**
- * Calculate monthly Sodra contributions with stažas tracking.
- *
- * Stažas: 1 mėn. stažo = VSD sumokėta nuo >= 1 MMA bazės.
- * Jei bazė < MMA, stažas proporcingai mažesnis.
- */
 export function calculateMonthlySodra(
   incomes: Income[],
   expenses: Expense[],
@@ -144,7 +116,7 @@ export function calculateMonthlySodra(
   for (let m = 1; m <= 12; m++) {
     let vsdAmount: number;
     let psdAmount: number;
-    let vsdBase: number; // for stažas calculation
+    let vsdBase: number;
 
     if (mode === "civil_contract") {
       const ytdIncome = incomes
@@ -171,13 +143,12 @@ export function calculateMonthlySodra(
       const cappedVsd = Math.min(vsdMonthlyBase, rates.sodraCeiling / 12);
 
       vsdBase = cappedVsd;
-      vsdAmount = round2(cappedVsd * rates.vsd);
+      vsdAmount = round2(cappedVsd * rates.vsdMember);
       psdAmount = round2(monthlyBase * rates.psd);
     } else {
-      // profit_withdrawal
       if (options?.voluntarySodra) {
         vsdBase = mmaMonthly;
-        vsdAmount = round2(mmaMonthly * rates.vsd);
+        vsdAmount = round2(mmaMonthly * rates.vsdMember);
         psdAmount = round2(mmaMonthly * rates.psd);
       } else {
         vsdBase = 0;
@@ -189,21 +160,26 @@ export function calculateMonthlySodra(
     const total = round2(vsdAmount + psdAmount);
     cumulative = round2(cumulative + total);
 
-    // Stažas: proportional to VSD base vs MMA
     const stazasMonths = mmaMonthly > 0
       ? round2(Math.min(1, vsdBase / mmaMonthly))
       : 0;
     stazasCum = round2(stazasCum + stazasMonths);
 
-    months.push({ month: m, vsdAmount, psdAmount, employerSodra: 0, total, cumulative, stazasMonths, stazasCumulative: stazasCum });
+    months.push({
+      month: m,
+      vsdAmount,
+      psdAmount,
+      employerSodra: 0,
+      total,
+      cumulative,
+      stazasMonths,
+      stazasCumulative: stazasCum,
+    });
   }
 
   return months;
 }
 
-/**
- * Calculate quarterly GPM advance payments.
- */
 export function calculateQuarterlyGPM(
   incomes: Income[],
   expenses: Expense[],
@@ -241,12 +217,12 @@ export function calculateQuarterlyGPM(
       const sodraBase = taxableYTD;
       const vsdBase = inDiscount ? Math.min(sodraBase, mmaAnnualBase) : sodraBase;
       const cappedVsd = Math.min(vsdBase, rates.sodraCeiling);
-      const vsdYTD = round2(cappedVsd * rates.vsd);
+      const vsdYTD = round2(cappedVsd * rates.vsdMember);
       const psdYTD = round2(sodraBase * rates.psd);
       const gpmBaseYTD = Math.max(0, taxableYTD - vsdYTD - psdYTD);
-      gpmYTD = round2(gpmBaseYTD * rates.gpm);
+      gpmYTD = round2(gpmBaseYTD * rates.gpmCivilContract);
     } else {
-      gpmYTD = round2(taxableYTD * rates.gpm);
+      gpmYTD = round2(taxableYTD * rates.gpmCivilContract);
     }
 
     const gpmAdvance = round2(Math.max(0, gpmYTD - previousAdvances));

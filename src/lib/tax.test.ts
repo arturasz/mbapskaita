@@ -44,8 +44,8 @@ describe("calculateAnnualTax — civil_contract mode", () => {
     expect(result.taxableIncome).toBe(50000);
 
     // Sodra base = 50000 (full taxable income for civil contract)
-    // VSD = 50000 * 0.1252 = 6260
-    const expectedVsd = Math.round(50000 * 0.1252 * 100) / 100;
+    // VSD = 50000 * 0.1383 = 6915
+    const expectedVsd = Math.round(50000 * 0.1383 * 100) / 100;
     expect(result.vsdAmount).toBe(expectedVsd);
 
     // PSD = 50000 * 0.0698 = 3490
@@ -131,9 +131,9 @@ describe("calculateAnnualTax — profit_withdrawal mode", () => {
       voluntarySodra: true,
     });
 
-    // MMA 2026 = 1088, annual = 13056
-    const mmaAnnual = 1088 * 12;
-    const expectedVsd = Math.round(mmaAnnual * 0.1252 * 100) / 100;
+    // MMA 2026 = 1153, annual = 13836
+    const mmaAnnual = 1153 * 12;
+    const expectedVsd = Math.round(mmaAnnual * 0.1383 * 100) / 100;
     const expectedPsd = Math.round(mmaAnnual * 0.0698 * 100) / 100;
 
     expect(result.vsdAmount).toBe(expectedVsd);

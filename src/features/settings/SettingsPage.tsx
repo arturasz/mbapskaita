@@ -136,38 +136,20 @@ export function SettingsPage() {
 
       <Card title="Pajamų išėmimo planas">
         <div className="space-y-5">
-          {/* Sodra stažui (savarankiškai) */}
+          {/* Lėšos asmeniniams poreikiams (code 02) */}
           <div className="space-y-2">
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
-                checked={plan.sodraSelfEnabled}
-                onChange={(e) => handlePlanChange({ sodraSelfEnabled: e.target.checked })}
+                checked={plan.memberWithdrawalEnabled}
+                onChange={(e) => handlePlanChange({ memberWithdrawalEnabled: e.target.checked })}
                 className="rounded border-gray-300"
               />
               <div>
-                <span className="text-sm font-medium text-gray-700">Sodra stažui (savarankiškai dirbantis)</span>
-                <p className="text-xs text-gray-500">VSD+PSD nuo pasirinktos bazės stažui kaupti. Nepriklausoma nuo išėmimo būdo.</p>
+                <span className="text-sm font-medium text-gray-700">Lėšos asmeniniams poreikiams (code 02)</span>
+                <p className="text-xs text-gray-500">GPM 15%, VSD 13.83% + PSD 6.98%. Stažo kaupimas. Iš pelno po pelno mokesčio.</p>
               </div>
             </label>
-            {plan.sodraSelfEnabled && (
-              <label className="ml-9 block">
-                <span className="text-sm text-gray-600">Mėnesinė Sodra bazė</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={plan.sodraSelfBase || ""}
-                    onChange={(e) => handlePlanChange({ sodraSelfBase: Number(e.target.value) || 0 })}
-                    placeholder="0 = MMA"
-                    className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <span className="text-sm text-gray-500">EUR/men.</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-500">0 = naudojama MMA (minimali mėnesinė alga)</p>
-              </label>
-            )}
           </div>
 
           {/* Civil contract (civilinė sutartis) */}
@@ -206,22 +188,6 @@ export function SettingsPage() {
                 )}
               </label>
             )}
-          </div>
-
-          {/* Dividends (pelno išėmimas) */}
-          <div>
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={plan.dividendsEnabled}
-                onChange={(e) => handlePlanChange({ dividendsEnabled: e.target.checked })}
-                className="rounded border-gray-300"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Pelno išėmimas (dividendai)</span>
-                <p className="text-xs text-gray-500">GPM 15%, be Sodros (tik privaloma PSD nuo MMA jei nėra kitų šaltinių)</p>
-              </div>
-            </label>
           </div>
 
           {/* Withdrawal target */}
