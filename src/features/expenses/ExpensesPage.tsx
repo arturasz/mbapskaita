@@ -18,7 +18,6 @@ const emptyForm = {
   amountEur: "",
   category: "software" as ExpenseCategory,
   vatDeductible: true,
-  vatAmount: "",
 };
 
 type FormState = typeof emptyForm;
@@ -32,7 +31,6 @@ function expenseToForm(expense: Expense): FormState {
     amountEur: String(expense.amountEur),
     category: expense.category,
     vatDeductible: expense.vatDeductible,
-    vatAmount: expense.vatAmount != null ? String(expense.vatAmount) : "",
   };
 }
 
@@ -112,16 +110,18 @@ export function ExpensesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const amountEur = form.currency === "EUR" ? Number(form.amount) : Number(form.amountEur);
     const data = {
       date: form.date,
       description: form.description,
       amount: Number(form.amount),
       currency: form.currency,
-      amountEur:
-        form.currency === "EUR" ? Number(form.amount) : Number(form.amountEur),
+      amountEur,
       category: form.category,
       vatDeductible: form.vatDeductible,
-      vatAmount: form.vatAmount ? Number(form.vatAmount) : undefined,
+      vatAmount: form.vatDeductible
+        ? Math.round(amountEur * (21 / 121) * 100) / 100
+        : undefined,
     };
 
     if (editingId) {
@@ -286,21 +286,16 @@ export function ExpensesPage() {
                 PVM atskaitomas
               </span>
             </label>
-            {form.vatDeductible && (
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">
-                  PVM suma
+            {form.vatDeductible && Number(form.amount) > 0 && (
+              <p className="flex items-center gap-2 text-sm text-gray-600">
+                PVM (21%): <span className="font-medium">
+                  {(Math.round(
+                    (form.currency === "EUR" ? Number(form.amount) : Number(form.amountEur || 0))
+                    * (21 / 121) * 100
+                  ) / 100).toFixed(2)} EUR
                 </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={form.vatAmount}
-                  onChange={(e) =>
-                    setForm({ ...form, vatAmount: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
+                <span className="text-xs text-gray-400">(skaičiuojama automatiškai nuo sumos su PVM)</span>
+              </p>
             )}
             <div className="flex items-end gap-3 sm:col-span-2">
               <button
