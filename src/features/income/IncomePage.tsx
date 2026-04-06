@@ -347,7 +347,9 @@ export function IncomePage() {
                     Redaguoti
                   </button>
                   <button
-                    onClick={() => remove(i.id)}
+                    onClick={() => {
+                      if (window.confirm("Ar tikrai norite pašalinti?")) remove(i.id);
+                    }}
                     className="text-sm text-red-600 hover:text-red-800"
                   >
                     Pašalinti

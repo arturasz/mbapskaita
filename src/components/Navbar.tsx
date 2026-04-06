@@ -8,6 +8,7 @@ const links = [
   { to: "/calculator", label: "Skaičiuoklė" },
   { to: "/investments", label: "Investicijos" },
   { to: "/guides", label: "Gidai" },
+  { to: "/settings", label: "Nustatymai" },
 ];
 
 export function Navbar() {

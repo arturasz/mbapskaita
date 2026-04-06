@@ -7,6 +7,7 @@ import { VATPage } from "./features/vat/VATPage";
 import { CalculatorPage } from "./features/calculator/CalculatorPage";
 import { InvestmentsPage } from "./features/investments/InvestmentsPage";
 import { GuidesPage } from "./features/guides/GuidesPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="calculator" element={<CalculatorPage />} />
           <Route path="investments" element={<InvestmentsPage />} />
           <Route path="guides" element={<GuidesPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

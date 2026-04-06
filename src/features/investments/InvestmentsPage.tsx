@@ -29,10 +29,11 @@ const emptyForm = {
 };
 
 export function InvestmentsPage() {
-  const { investments, loaded, hydrate, add, importBatch, remove } = useInvestmentStore();
+  const { investments, loaded, hydrate, add, update, importBatch, remove } = useInvestmentStore();
   const { settings, loaded: sl, hydrate: hs } = useSettingsStore();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loaded) hydrate();
@@ -53,6 +54,31 @@ export function InvestmentsPage() {
     if (result.skipped > 0) parts.push(`praleista ${result.skipped} (dublikatai)`);
     setImportStatus(parts.join(", "));
     setTimeout(() => setImportStatus(null), 5000);
+  };
+
+  const investmentToForm = (inv: Investment) => ({
+    asset: inv.asset,
+    purchaseDate: inv.purchaseDate,
+    purchasePrice: String(inv.purchasePrice),
+    currency: inv.currency,
+    purchasePriceEur: String(inv.purchasePriceEur),
+    quantity: String(inv.quantity),
+    broker: inv.broker,
+    saleDate: inv.saleDate ?? "",
+    salePrice: inv.salePrice != null ? String(inv.salePrice) : "",
+    salePriceEur: inv.salePriceEur != null ? String(inv.salePriceEur) : "",
+  });
+
+  const startEdit = (inv: Investment) => {
+    setForm(investmentToForm(inv));
+    setEditingId(inv.id);
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setShowForm(false);
   };
 
   const handleIBKRFiles = async (files: File[]) => {
@@ -81,8 +107,7 @@ export function InvestmentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const inv: Investment = {
-      id: crypto.randomUUID(),
+    const data = {
       asset: form.asset,
       purchaseDate: form.purchaseDate,
       purchasePrice: Number(form.purchasePrice),
@@ -101,9 +126,12 @@ export function InvestmentsPage() {
           ? Number(form.salePrice)
           : undefined,
     };
-    await add(inv);
-    setForm(emptyForm);
-    setShowForm(false);
+    if (editingId) {
+      await update(editingId, data);
+    } else {
+      await add({ id: crypto.randomUUID(), ...data });
+    }
+    cancelForm();
   };
 
   if (!loaded || !sl) return <p className="text-gray-500">Kraunama...</p>;
@@ -116,7 +144,7 @@ export function InvestmentsPage() {
           <FileImport label="IBKR failai" onFiles={handleIBKRFiles} />
           <DirectoryImport label="IBKR katalogas" onFiles={handleIBKRFiles} />
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => (showForm ? cancelForm() : setShowForm(true))}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             {showForm ? "Atšaukti" : "Pridėti investiciją"}
@@ -137,7 +165,7 @@ export function InvestmentsPage() {
       </div>
 
       {showForm && (
-        <Card>
+        <Card title={editingId ? "Redaguoti investiciją" : "Nauja investicija"}>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-gray-700">Turtas</span>
@@ -223,13 +251,22 @@ export function InvestmentsPage() {
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               />
             </label>
-            <div className="flex items-end sm:col-span-2">
+            <div className="flex items-end gap-3 sm:col-span-2">
               <button
                 type="submit"
                 className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
-                Išsaugoti
+                {editingId ? "Atnaujinti" : "Išsaugoti"}
               </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={cancelForm}
+                  className="rounded-md bg-gray-200 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >
+                  Atšaukti
+                </button>
+              )}
             </div>
           </form>
         </Card>
@@ -263,12 +300,24 @@ export function InvestmentsPage() {
               key: "actions",
               header: "",
               render: (inv) => (
-                <button
-                  onClick={() => remove(inv.id)}
-                  className="text-sm text-red-600 hover:text-red-800"
-                >
-                  Pašalinti
-                </button>
+                <span className="flex gap-2">
+                  <button
+                    onClick={() => startEdit(inv)}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Redaguoti
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Ar tikrai norite pašalinti?")) {
+                        remove(inv.id);
+                      }
+                    }}
+                    className="text-sm text-red-600 hover:text-red-800"
+                  >
+                    Pašalinti
+                  </button>
+                </span>
               ),
             },
           ]}

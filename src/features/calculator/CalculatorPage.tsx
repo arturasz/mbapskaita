@@ -4,7 +4,7 @@ import { StatCard } from "../../components/StatCard";
 import { Badge } from "../../components/Badge";
 import { calculateAnnualTax, isInSodraDiscountPeriod } from "../../lib/tax";
 import { taxRatesByYear } from "../../data/tax-rates";
-import type { Income, Expense } from "../../types";
+import type { Income, Expense, IncomeSourceCountry } from "../../types";
 
 function fmt(n: number): string {
   return n.toLocaleString("lt-LT", { style: "currency", currency: "EUR" });
@@ -17,6 +17,7 @@ export function CalculatorPage() {
   const [income, setIncome] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [activityStartDate, setActivityStartDate] = useState("");
+  const [sourceCountry, setSourceCountry] = useState<IncomeSourceCountry>("US");
 
   const discountActive = isInSodraDiscountPeriod(year, activityStartDate || undefined);
 
@@ -35,7 +36,7 @@ export function CalculatorPage() {
         amountEur: inc,
         category: "services",
         client: "Skaičiuoklė",
-        sourceCountry: "US",
+        sourceCountry,
       },
     ];
     const fakeExpense: Expense[] =
@@ -57,7 +58,7 @@ export function CalculatorPage() {
     return calculateAnnualTax(fakeIncome, fakeExpense, year, {
       activityStartDate: activityStartDate || undefined,
     });
-  }, [income, expenseAmount, year, activityStartDate]);
+  }, [income, expenseAmount, year, activityStartDate, sourceCountry]);
 
   return (
     <div className="space-y-6">
@@ -100,6 +101,20 @@ export function CalculatorPage() {
               placeholder="pvz. 5000"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Pajamų šaltinis</span>
+            <select
+              value={sourceCountry}
+              onChange={(e) => setSourceCountry(e.target.value as IncomeSourceCountry)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="LT">Lietuva</option>
+              <option value="US">JAV</option>
+              <option value="GB">Jungtinė Karalystė</option>
+              <option value="DE">Vokietija</option>
+              <option value="Other">Kita</option>
+            </select>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Veiklos pradžia</span>

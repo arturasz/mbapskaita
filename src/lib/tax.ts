@@ -1,4 +1,11 @@
-import type { AnnualTaxSummary, Income, Expense } from "../types";
+import type {
+  AnnualTaxSummary,
+  Income,
+  Expense,
+  MonthlySodra,
+  QuarterlyGPM,
+  Quarter,
+} from "../types";
 import { getTaxRates } from "../data/tax-rates";
 
 export interface TaxOptions {
@@ -86,6 +93,121 @@ export function isInSodraDiscountPeriod(
   if (!activityStartDate) return false;
   const startYear = new Date(activityStartDate).getFullYear();
   return year >= startYear && year < startYear + 2;
+}
+
+/**
+ * Calculate monthly Sodra contributions.
+ * Sodra is paid monthly by the 15th. Each month's contribution is 1/12 of annual.
+ * Uses year-to-date income to estimate the annual base.
+ */
+export function calculateMonthlySodra(
+  incomes: Income[],
+  expenses: Expense[],
+  year: number,
+  options?: TaxOptions,
+): MonthlySodra[] {
+  const rates = getTaxRates(year);
+  const inDiscount = isInSodraDiscountPeriod(year, options?.activityStartDate);
+  const mmaAnnualBase = rates.minMonthlyWage * 12;
+  const months: MonthlySodra[] = [];
+  let cumulative = 0;
+
+  for (let m = 1; m <= 12; m++) {
+    const ytdIncome = incomes
+      .filter((i) => {
+        const d = new Date(i.date);
+        return d.getFullYear() === year && d.getMonth() < m;
+      })
+      .reduce((s, i) => s + i.amountEur, 0);
+
+    const ytdExpenses = expenses
+      .filter((e) => {
+        const d = new Date(e.date);
+        return d.getFullYear() === year && d.getMonth() < m;
+      })
+      .reduce((s, e) => s + e.amountEur, 0);
+
+    const ytdProfit = Math.max(0, ytdIncome - ytdExpenses);
+    // Project annual from YTD
+    const projectedAnnual = m > 0 ? (ytdProfit / m) * 12 : 0;
+    const fullSodraBase = projectedAnnual * 0.9;
+    const monthlyBase = fullSodraBase / 12;
+
+    const vsdMonthlyBase = inDiscount
+      ? Math.min(monthlyBase, mmaAnnualBase / 12)
+      : monthlyBase;
+    const cappedVsd = Math.min(vsdMonthlyBase, rates.sodraCeiling / 12);
+
+    const vsdAmount = round2(cappedVsd * rates.vsd);
+    const psdAmount = round2(monthlyBase * rates.psd);
+    const total = round2(vsdAmount + psdAmount);
+    cumulative = round2(cumulative + total);
+
+    months.push({ month: m, vsdAmount, psdAmount, total, cumulative });
+  }
+
+  return months;
+}
+
+/**
+ * Calculate quarterly GPM advance payments.
+ * Advance GPM is paid quarterly by the 15th of the month after quarter end.
+ * Each quarter recalculates YTD tax and subtracts previous advances.
+ */
+export function calculateQuarterlyGPM(
+  incomes: Income[],
+  expenses: Expense[],
+  year: number,
+  options?: TaxOptions,
+): QuarterlyGPM[] {
+  const rates = getTaxRates(year);
+  const inDiscount = isInSodraDiscountPeriod(year, options?.activityStartDate);
+  const mmaAnnualBase = rates.minMonthlyWage * 12;
+  const quarters: QuarterlyGPM[] = [];
+  let previousAdvances = 0;
+
+  for (const q of [1, 2, 3, 4] as Quarter[]) {
+    const endMonth = q * 3; // Q1=3, Q2=6, Q3=9, Q4=12
+
+    const ytdIncome = incomes
+      .filter((i) => {
+        const d = new Date(i.date);
+        return d.getFullYear() === year && d.getMonth() < endMonth;
+      })
+      .reduce((s, i) => s + i.amountEur, 0);
+
+    const ytdExpenses = expenses
+      .filter((e) => {
+        const d = new Date(e.date);
+        return d.getFullYear() === year && d.getMonth() < endMonth;
+      })
+      .reduce((s, e) => s + e.amountEur, 0);
+
+    const taxableYTD = Math.max(0, ytdIncome - ytdExpenses);
+    const fullSodraBase = taxableYTD * 0.9;
+    const vsdBase = inDiscount ? Math.min(fullSodraBase, mmaAnnualBase) : fullSodraBase;
+    const cappedVsd = Math.min(vsdBase, rates.sodraCeiling);
+
+    const vsdYTD = round2(cappedVsd * rates.vsd);
+    const psdYTD = round2(fullSodraBase * rates.psd);
+    const gpmBaseYTD = Math.max(0, taxableYTD - vsdYTD - psdYTD);
+    const gpmYTD = round2(gpmBaseYTD * rates.gpm);
+    const gpmAdvance = round2(Math.max(0, gpmYTD - previousAdvances));
+
+    quarters.push({
+      quarter: q,
+      incomeYTD: round2(ytdIncome),
+      expensesYTD: round2(ytdExpenses),
+      taxableYTD: round2(taxableYTD),
+      gpmYTD,
+      gpmAdvance,
+      previousAdvances: round2(previousAdvances),
+    });
+
+    previousAdvances = round2(previousAdvances + gpmAdvance);
+  }
+
+  return quarters;
 }
 
 function round2(n: number): number {

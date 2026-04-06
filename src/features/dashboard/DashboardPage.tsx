@@ -1,20 +1,32 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StatCard } from "../../components/StatCard";
 import { Card } from "../../components/Card";
 import { useIncomeStore } from "../../stores/income-store";
 import { useExpenseStore } from "../../stores/expense-store";
 import { useSettingsStore } from "../../stores/settings-store";
-import { calculateAnnualTax } from "../../lib/tax";
+import {
+  calculateAnnualTax,
+  calculateMonthlySodra,
+  calculateQuarterlyGPM,
+} from "../../lib/tax";
+import { taxRatesByYear } from "../../data/tax-rates";
 import { getUpcomingDeadlines } from "../../data/deadlines";
 
 function fmt(n: number): string {
   return n.toLocaleString("lt-LT", { style: "currency", currency: "EUR" });
 }
 
+const monthNames = [
+  "Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis",
+  "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis",
+];
+
+const availableYears = Object.keys(taxRatesByYear).map(Number);
+
 export function DashboardPage() {
   const { incomes, hydrate: hydrateIncome, loaded: incomeLoaded } = useIncomeStore();
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
-  const { settings, hydrate: hydrateSettings, loaded: settingsLoaded } = useSettingsStore();
+  const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
   useEffect(() => {
     if (!incomeLoaded) hydrateIncome();
@@ -22,13 +34,36 @@ export function DashboardPage() {
     if (!settingsLoaded) hydrateSettings();
   }, [incomeLoaded, expenseLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateSettings]);
 
-  const year = settings.fiscalYear;
+  const [year, setYear] = useState(settings.fiscalYear);
+
+  // Sync year with settings when settings load
+  useEffect(() => {
+    if (settingsLoaded) setYear(settings.fiscalYear);
+  }, [settingsLoaded, settings.fiscalYear]);
+
+  const handleYearChange = (newYear: number) => {
+    setYear(newYear);
+    updateSettings({ fiscalYear: newYear });
+  };
+
+  const opts = useMemo(
+    () => ({ activityStartDate: settings.activityStartDate }),
+    [settings.activityStartDate],
+  );
+
   const tax = useMemo(
-    () =>
-      calculateAnnualTax(incomes, expenses, year, {
-        activityStartDate: settings.activityStartDate,
-      }),
-    [incomes, expenses, year, settings.activityStartDate],
+    () => calculateAnnualTax(incomes, expenses, year, opts),
+    [incomes, expenses, year, opts],
+  );
+
+  const monthlySodra = useMemo(
+    () => calculateMonthlySodra(incomes, expenses, year, opts),
+    [incomes, expenses, year, opts],
+  );
+
+  const quarterlyGPM = useMemo(
+    () => calculateQuarterlyGPM(incomes, expenses, year, opts),
+    [incomes, expenses, year, opts],
   );
 
   const deadlines = useMemo(() => getUpcomingDeadlines(new Date(), 5), []);
@@ -39,7 +74,18 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900">{year} m. suvestinė</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">{year} m. suvestinė</h1>
+        <select
+          value={year}
+          onChange={(e) => handleYearChange(Number(e.target.value))}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+        >
+          {availableYears.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Pajamos" value={fmt(tax.totalIncome)} />
@@ -90,6 +136,64 @@ export function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* GPM quarterly advances */}
+      <Card title="GPM avansiniai mokėjimai (kas ketvirtį)">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs font-medium uppercase text-gray-500">
+                <th className="px-3 py-2">Ketvirtis</th>
+                <th className="px-3 py-2 text-right">Pajamos YTD</th>
+                <th className="px-3 py-2 text-right">Išlaidos YTD</th>
+                <th className="px-3 py-2 text-right">GPM YTD</th>
+                <th className="px-3 py-2 text-right">Ankstesni avansai</th>
+                <th className="px-3 py-2 text-right font-bold">Mokėti</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quarterlyGPM.map((q) => (
+                <tr key={q.quarter} className="border-b hover:bg-gray-50">
+                  <td className="px-3 py-2">Q{q.quarter}</td>
+                  <td className="px-3 py-2 text-right">{fmt(q.incomeYTD)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(q.expensesYTD)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(q.gpmYTD)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(q.previousAdvances)}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{fmt(q.gpmAdvance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Sodra monthly breakdown */}
+      <Card title="Sodra mėnesinės įmokos">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs font-medium uppercase text-gray-500">
+                <th className="px-3 py-2">Mėnuo</th>
+                <th className="px-3 py-2 text-right">VSD</th>
+                <th className="px-3 py-2 text-right">PSD</th>
+                <th className="px-3 py-2 text-right">Viso</th>
+                <th className="px-3 py-2 text-right">Kumuliacinis</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlySodra.map((m) => (
+                <tr key={m.month} className="border-b hover:bg-gray-50">
+                  <td className="px-3 py-2">{monthNames[m.month - 1]}</td>
+                  <td className="px-3 py-2 text-right">{fmt(m.vsdAmount)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(m.psdAmount)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{fmt(m.total)}</td>
+                  <td className="px-3 py-2 text-right text-gray-500">{fmt(m.cumulative)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

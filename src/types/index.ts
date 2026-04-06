@@ -136,6 +136,24 @@ export interface QuarterlyVATSummary {
   vatPayable: number;
 }
 
+export interface MonthlySodra {
+  month: number; // 1-12
+  vsdAmount: number;
+  psdAmount: number;
+  total: number;
+  cumulative: number; // year-to-date total
+}
+
+export interface QuarterlyGPM {
+  quarter: Quarter;
+  incomeYTD: number;
+  expensesYTD: number;
+  taxableYTD: number;
+  gpmYTD: number;
+  gpmAdvance: number; // this quarter's advance payment
+  previousAdvances: number;
+}
+
 export interface InvestmentGain {
   investmentId: string;
   asset: string;
