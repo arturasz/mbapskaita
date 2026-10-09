@@ -4,44 +4,27 @@
     <meta charset="utf-8" />
     <style>
       body { font: 13px system-ui, sans-serif; margin: 12px; }
-      .step { border: 1px solid #8884; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-      .step.done { border-color: #2a7; }
-      h3 { margin: 0 0 6px; font-size: 13px; }
-      button { padding: 6px 10px; margin-top: 6px; }
-      #log { white-space: pre-wrap; color: #888; }
-      input[type=password] { width: 100%; box-sizing: border-box; }
-      #log { user-select: text; }
+      .box { border: 1px solid #8884; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+      button { padding: 8px 12px; }
+      #sync { width: 100%; font-size: 14px; font-weight: 600; }
+      #log { white-space: pre-wrap; color: #888; user-select: text; margin-top: 8px; }
+      input[type=password] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+      .hidden { display: none; }
     </style>
   </head>
   <body>
-    <div class="step" id="s0">
-      <h3>0. Inbox token (once)</h3>
-      <input id="token" type="password" placeholder="paste inbox token" />
+    <div class="box hidden" id="tokenBox">
+      <div>First time: paste the inbox token.</div>
+      <input id="token" type="password" placeholder="inbox token" />
       <button id="saveToken">Save</button>
     </div>
-    <div class="step" id="s1">
-      <h3>1. Open Deel invoices</h3>
-      <div>Log in yourself if asked.</div>
-      <button id="open">Open Deel</button>
+    <div class="box">
+      <label>Only invoices issued from <input type="date" id="from" /></label>
+      <div>Empty = all. You must be logged in to Deel.</div>
     </div>
-    <div class="step" id="s2">
-      <h3>2. Read invoice list</h3>
-      <label>Collect paid invoices issued from <input type="date" id="from" /></label>
-      <div>Empty = all.</div>
-      <button id="read">Read list</button>
-    </div>
-    <div class="step" id="s3">
-      <h3>3. Open each invoice</h3>
-      <div>Keep the Deel list tab open.</div>
-      <button id="collect" disabled>Collect invoices + PDFs</button>
-    </div>
-    <div class="step" id="s4">
-      <h3>4. Send to MB</h3>
-      <button id="send" disabled>Send</button>
-      <button id="openMb" disabled>Open MB &rarr; Income</button>
-    </div>
-    <button id="copy">Copy log</button>
+    <button id="sync">Sync Deel invoices to MB</button>
     <div id="log"></div>
+    <button id="copy">Copy log</button>
     <script src="sidebar.js"></script>
   </body>
 </html>
