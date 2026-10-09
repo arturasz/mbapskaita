@@ -79,6 +79,6 @@ function readIssueDate() {
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === "readList") return readList();
-  if (msg.type === "readDetail") return waitFor(readIssueDate, 10000);
+  if (msg.type === "readDetail") return waitFor(readIssueDate, 2000);
   return undefined;
 });

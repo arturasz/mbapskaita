@@ -60,7 +60,7 @@ async function upload(token) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function waitTabComplete(tabId, timeout = 30000) {
+function waitTabComplete(tabId, timeout = 15000) {
   return new Promise((resolve) => {
     const finish = () => {
       clearTimeout(timer);
@@ -75,8 +75,9 @@ function waitTabComplete(tabId, timeout = 30000) {
   });
 }
 
-async function readDetail(tabId) {
-  for (let i = 0; i < 80; i++) {
+async function readDetail(tabId, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
     try {
       const date = await browser.tabs.sendMessage(tabId, { type: "readDetail" });
       if (date) return date;
@@ -88,8 +89,9 @@ async function readDetail(tabId) {
   return null;
 }
 
-async function waitPdf(number) {
-  for (let i = 0; i < 120; i++) {
+async function waitPdf(number, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
     if (pdfs.has(number)) return pdfs.get(number);
     await sleep(250);
   }
@@ -110,19 +112,32 @@ async function collectAll(invoices, fromDate) {
       .sendMessage({ type: "progress", text: `${finished}/${invoices.length} done` })
       .catch(() => {});
 
+  const slow = [];
   const handle = async (tabId, invoice, index) => {
     if (!invoice.url) throw new Error("no link in list");
+    const t0 = Date.now();
+    const lap = () => ((Date.now() - t0) / 1000).toFixed(1);
     pdfs.delete(invoice.invoiceNumber);
-    const loaded = waitTabComplete(tabId);
-    await browser.tabs.update(tabId, { url: invoice.url });
-    await loaded;
-    const issueDate = await readDetail(tabId);
-    if (!issueDate) throw new Error("issue date not found");
-    if (fromDate && issueDate < fromDate) {
-      stopAfter = Math.min(stopAfter, index + 2);
-      return;
+    let issueDate = null;
+    let pdfBase64 = null;
+    let timing = "";
+    for (let attempt = 1; attempt <= 2 && !(issueDate && pdfBase64); attempt++) {
+      const loaded = waitTabComplete(tabId);
+      await browser.tabs.update(tabId, { url: invoice.url });
+      await loaded;
+      timing += ` load ${lap()}s`;
+      issueDate = await readDetail(tabId);
+      timing += ` date ${lap()}s`;
+      if (!issueDate) continue;
+      if (fromDate && issueDate < fromDate) {
+        stopAfter = Math.min(stopAfter, index + 2);
+        return;
+      }
+      pdfBase64 = await waitPdf(invoice.invoiceNumber);
+      timing += ` pdf ${lap()}s`;
     }
-    const pdfBase64 = await waitPdf(invoice.invoiceNumber);
+    if (Date.now() - t0 > 12000 || !pdfBase64) slow.push(`${invoice.invoiceNumber}:${timing}`);
+    if (!issueDate) throw new Error("issue date not found");
     if (!pdfBase64) failed.push(`${invoice.invoiceNumber}: no PDF captured`);
     const { url, ...rest } = invoice;
     collected = collected.filter((c) => c.invoiceNumber !== invoice.invoiceNumber);
@@ -149,7 +164,7 @@ async function collectAll(invoices, fromDate) {
   };
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, invoices.length) }, worker));
-  return failed;
+  return [...failed, ...slow.map((s) => `slow ${s}`)];
 }
 
 browser.runtime.onMessage.addListener((msg) => {
