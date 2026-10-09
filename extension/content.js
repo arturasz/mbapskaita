@@ -25,8 +25,10 @@ function parseRow(row) {
   const currency = amountText.includes("€") ? "EUR" : amountText.includes("£") ? "GBP" : "USD";
   const firstCell = row.querySelector('[role="cell"]');
   const lines = (firstCell?.innerText ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const href = row.querySelector('a[href*="/invoice/"]')?.href;
   return {
     invoiceNumber: number,
+    url: href,
     period: text("work-period"),
     amount,
     currency,
@@ -66,18 +68,6 @@ async function readList() {
   return [...seen.values()];
 }
 
-async function findRow(number) {
-  const area = scroller();
-  area.scrollTop = 0;
-  for (let i = 0; i < 40; i++) {
-    const row = rowEls().find((r) => r.innerText.includes(number));
-    if (row) return row;
-    area.scrollBy(0, 500);
-    await sleep(300);
-  }
-  return null;
-}
-
 const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
 
 function readIssueDate() {
@@ -87,64 +77,8 @@ function readIssueDate() {
   return month ? `${m[3]}-${String(month).padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
 }
 
-async function collectOne(invoice, fromDate) {
-  const row = await findRow(invoice.invoiceNumber);
-  if (!row) throw new Error("row not found");
-  const target = row.querySelector('[data-qa="work-period"]') ?? row;
-  for (const type of ["mousedown", "mouseup", "click"]) {
-    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
-  }
-  const issueDate = await waitFor(readIssueDate);
-  if (!issueDate) {
-    const snippet = document.body.innerText.replace(/\s+/g, " ").slice(0, 160);
-    throw new Error(`issue date not found at ${location.pathname} :: ${snippet}`);
-  }
-  const goBack = async () => {
-    document.querySelector('[data-qa="page-header-secondary-back-button"]')?.click();
-    await waitFor(() => rowEls().length > 0);
-  };
-  if (fromDate && issueDate < fromDate) {
-    await goBack();
-    return { issueDate, tooOld: true };
-  }
-  let pdfBase64 = null;
-  for (let i = 0; i < 60 && !pdfBase64; i++) {
-    pdfBase64 = await browser.runtime.sendMessage({ type: "pdfFor", number: invoice.invoiceNumber });
-    if (!pdfBase64) await sleep(500);
-  }
-  await browser.runtime.sendMessage({
-    type: "collect",
-    invoice: { ...invoice, issueDate, pdfBase64 },
-  });
-  await goBack();
-  return { issueDate, hasPdf: !!pdfBase64 };
-}
-
-async function collectMany(invoices, fromDate) {
-  const failed = [];
-  let older = 0; // list is newest first: stop after two invoices older than fromDate
-  for (const [i, invoice] of invoices.entries()) {
-    browser.runtime.sendMessage({
-      type: "progress",
-      text: `${i + 1}/${invoices.length} ${invoice.invoiceNumber}`,
-    });
-    try {
-      const result = await collectOne(invoice, fromDate);
-      if (result.tooOld) {
-        if (++older >= 2) break;
-        continue;
-      }
-      older = 0;
-      if (!result.hasPdf) failed.push(`${invoice.invoiceNumber}: no PDF captured`);
-    } catch (err) {
-      failed.push(`${invoice.invoiceNumber}: ${err.message}`);
-    }
-  }
-  return failed;
-}
-
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === "readList") return readList();
-  if (msg.type === "collect-many") return collectMany(msg.invoices, msg.fromDate);
+  if (msg.type === "readDetail") return waitFor(readIssueDate, 10000);
   return undefined;
 });

@@ -56,7 +56,7 @@ $("collect").onclick = async () => {
   try {
     const tab = await deelTab();
     $("collect").disabled = true;
-    const failed = await browser.tabs.sendMessage(tab.id, { type: "collect-many", invoices: selected, fromDate: $("from").value || null });
+    const failed = await browser.runtime.sendMessage({ type: "collect-many", tabId: tab.id, invoices: selected, fromDate: $("from").value || null });
     const status = await browser.runtime.sendMessage({ type: "status" });
     log(`Collected ${status.count} (${status.withPdf} with PDF).` + (failed.length ? `\nProblems:\n${failed.join("\n")}` : ""));
     $("send").disabled = status.count === 0;

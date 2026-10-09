@@ -58,14 +58,81 @@ async function upload(token) {
   return results;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function waitTabComplete(tabId, timeout = 30000) {
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      browser.tabs.onUpdated.removeListener(listener);
+      resolve();
+    };
+    const listener = (id, info) => {
+      if (id === tabId && info.status === "complete") finish();
+    };
+    const timer = setTimeout(finish, timeout);
+    browser.tabs.onUpdated.addListener(listener);
+  });
+}
+
+async function readDetail(tabId) {
+  for (let i = 0; i < 40; i++) {
+    try {
+      const date = await browser.tabs.sendMessage(tabId, { type: "readDetail" });
+      if (date) return date;
+    } catch {
+      // content script not ready yet
+    }
+    await sleep(500);
+  }
+  return null;
+}
+
+async function waitPdf(number) {
+  for (let i = 0; i < 60; i++) {
+    if (pdfs.has(number)) return pdfs.get(number);
+    await sleep(500);
+  }
+  return null;
+}
+
+// Loads each invoice link as a fresh page, so Deel downloads the PDF again (no cache).
+async function collectAll(tabId, invoices, fromDate) {
+  const failed = [];
+  let older = 0; // list is newest first: stop after two invoices older than fromDate
+  for (const [i, invoice] of invoices.entries()) {
+    browser.runtime
+      .sendMessage({ type: "progress", text: `${i + 1}/${invoices.length} ${invoice.invoiceNumber}` })
+      .catch(() => {});
+    try {
+      if (!invoice.url) throw new Error("no link in list");
+      pdfs.delete(invoice.invoiceNumber);
+      const loaded = waitTabComplete(tabId);
+      await browser.tabs.update(tabId, { url: invoice.url });
+      await loaded;
+      const issueDate = await readDetail(tabId);
+      if (!issueDate) throw new Error("issue date not found");
+      if (fromDate && issueDate < fromDate) {
+        if (++older >= 2) break;
+        continue;
+      }
+      older = 0;
+      const pdfBase64 = await waitPdf(invoice.invoiceNumber);
+      if (!pdfBase64) failed.push(`${invoice.invoiceNumber}: no PDF captured`);
+      const { url, ...rest } = invoice;
+      collected = collected.filter((c) => c.invoiceNumber !== invoice.invoiceNumber);
+      collected.push({ ...rest, issueDate, pdfBase64 });
+    } catch (err) {
+      failed.push(`${invoice.invoiceNumber}: ${err.message}`);
+    }
+  }
+  return failed;
+}
+
 browser.runtime.onMessage.addListener((msg) => {
   switch (msg.type) {
-    case "pdfFor":
-      return Promise.resolve(pdfs.get(msg.number) ?? null);
-    case "collect":
-      collected = collected.filter((i) => i.invoiceNumber !== msg.invoice.invoiceNumber);
-      collected.push(msg.invoice);
-      return Promise.resolve(collected.length);
+    case "collect-many":
+      return collectAll(msg.tabId, msg.invoices, msg.fromDate);
     case "status":
       return Promise.resolve({
         count: collected.length,
