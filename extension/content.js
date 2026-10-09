@@ -68,17 +68,34 @@ async function readList() {
   return [...seen.values()];
 }
 
-const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+// Same-origin calls to Deel's own API (uses your logged-in session).
+async function deelJson(path) {
+  const res = await fetch(path, { credentials: "include", headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`Deel API ${res.status} for ${path.split("?")[0]}`);
+  return res.json();
+}
 
-function readIssueDate() {
-  const m = document.body.innerText.match(/Issue\s*Date[\s:]*([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
-  if (!m) return null;
-  const month = MONTHS.indexOf(m[1].toLowerCase()) + 1;
-  return month ? `${m[3]}-${String(month).padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
+const vilniusDate = (iso) =>
+  new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Vilnius" }); // YYYY-MM-DD
+
+async function fetchInvoice(url) {
+  const publicId = new URL(url).pathname.split("/").filter(Boolean).pop();
+  const [info, pdf] = await Promise.all([
+    deelJson(`/deelapi/invoices/${publicId}/extended`),
+    deelJson(`/deelapi/invoices/${publicId}/pdf?noredirect`),
+  ]);
+  return {
+    issueDate: vilniusDate(info.issuedAt),
+    amount: parseFloat(info.total),
+    currency: info.currency,
+    status: info.status,
+    client: info.client?.displayName ?? info.client?.name,
+    pdfUrl: pdf.url,
+  };
 }
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === "readList") return readList();
-  if (msg.type === "readDetail") return waitFor(readIssueDate, 2000);
+  if (msg.type === "fetchInvoice") return fetchInvoice(msg.url);
   return undefined;
 });
