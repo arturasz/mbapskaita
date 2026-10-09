@@ -35,3 +35,4 @@ skills-lock.json
 examples-do-not-commit
 extension-signed
 web-ext-artifacts
+extension/.amo-upload-uuid
