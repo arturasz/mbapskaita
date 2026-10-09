@@ -27,3 +27,8 @@ dist-ssr
 .omc
 .claude
 .vercel
+.env*
+
+.env*
+skills-lock.json
+.agents

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthGate } from "./components/AuthGate";
 import { Layout } from "./components/Layout";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { IncomePage } from "./features/income/IncomePage";
@@ -12,6 +13,7 @@ import { ConverterPage } from "./features/converter/ConverterPage";
 
 export default function App() {
   return (
+    <AuthGate>
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
@@ -27,5 +29,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </AuthGate>
   );
 }
