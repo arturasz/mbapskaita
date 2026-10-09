@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ecb/, ""),
       },
+      "/api/lb": {
+        target: "https://www.lb.lt",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/lb/, "/webservices/FxRates"),
+      },
     },
   },
 });
