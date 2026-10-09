@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/ecb/:path*", "destination": "https://www.ecb.europa.eu/:path*" },
+    { "source": "/api/lb/:path*", "destination": "https://www.lb.lt/webservices/FxRates/:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

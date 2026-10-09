@@ -6,11 +6,8 @@ const cache = new Map<string, number>();
 // For historical rates we try the ECB Statistical Data Warehouse API.
 // Fallback: latest rate if historical unavailable.
 
-// In dev, Vite proxies /api/ecb/* to ecb.europa.eu (avoids CORS).
-// In production (Electron), fetch directly.
-const ECB_LATEST = import.meta.env.DEV
-  ? "/api/ecb/stats/eurofxref/eurofxref-daily.xml"
-  : "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+// /api/ecb/* is proxied to ecb.europa.eu (avoids CORS): Vite in dev, Vercel rewrites in prod.
+const ECB_LATEST = "/api/ecb/stats/eurofxref/eurofxref-daily.xml";
 
 /**
  * Fetch exchange rate for a given currency to EUR.
