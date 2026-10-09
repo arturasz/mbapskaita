@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isAuthenticated } from "./_lib/auth.js";
-import { getSql } from "./_lib/db.js";
+import { ensureInboxTables, getSql } from "./_lib/db.js";
 
 type Req = IncomingMessage & { query: Record<string, string> };
 
@@ -16,12 +16,14 @@ export default async function handler(req: Req, res: ServerResponse) {
       res.statusCode = 400;
       return res.end("Bad id");
     }
-    const rows = await getSql()`SELECT name, encode(content, 'base64') AS b64 FROM files WHERE id = ${id}`;
+    const sql = getSql();
+    await ensureInboxTables(sql);
+    const rows = await sql`SELECT name, content_type, encode(content, 'base64') AS b64 FROM files WHERE id = ${id}`;
     if (!rows.length) {
       res.statusCode = 404;
       return res.end("Not found");
     }
-    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Type", (rows[0].content_type as string) ?? "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${rows[0].name}"`);
     res.end(Buffer.from(rows[0].b64 as string, "base64"));
   } catch (err) {

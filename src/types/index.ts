@@ -46,6 +46,7 @@ export interface Expense {
   category: ExpenseCategory;
   vatDeductible: boolean;
   vatAmount?: number;
+  fileId?: string; // stored receipt (PDF or image), served by /api/file
 }
 
 export interface VATRecord {

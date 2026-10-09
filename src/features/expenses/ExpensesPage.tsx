@@ -6,6 +6,7 @@ import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useExpenseStore } from "../../stores/expense-store";
 import type { ImportResult } from "../../stores/expense-store";
 import { parseExpenseCSV } from "../../lib/import-expenses";
+import { ReceiptDrop } from "./ReceiptDrop";
 import { expenseCategories } from "../../data/expense-categories";
 import { convertToEur } from "../../lib/currency";
 import type { Expense, Currency, ExpenseCategory } from "../../types";
@@ -161,6 +162,8 @@ export function ExpensesPage() {
           {importStatus}
         </div>
       )}
+
+      <ReceiptDrop />
 
       {showForm && (
         <Card title={editingId ? "Redaguoti išlaidą" : "Nauja išlaida"}>
@@ -366,6 +369,16 @@ export function ExpensesPage() {
               header: "",
               render: (e) => (
                 <div className="flex gap-3">
+                  {e.fileId && (
+                    <a
+                      href={`/api/file?id=${e.fileId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Failas
+                    </a>
+                  )}
                   <button
                     onClick={() => startEdit(e)}
                     className="text-sm text-blue-600 hover:text-blue-800"
