@@ -90,7 +90,6 @@ function readIssueDate() {
 async function collectOne(invoice) {
   const row = await findRow(invoice.invoiceNumber);
   if (!row) throw new Error("row not found");
-  const since = Date.now();
   const target = row.querySelector('[data-qa="work-period"]') ?? row;
   for (const type of ["mousedown", "mouseup", "click"]) {
     target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
@@ -101,8 +100,8 @@ async function collectOne(invoice) {
     throw new Error(`issue date not found at ${location.pathname} :: ${snippet}`);
   }
   let pdfBase64 = null;
-  for (let i = 0; i < 40 && !pdfBase64; i++) {
-    pdfBase64 = await browser.runtime.sendMessage({ type: "pdfSince", since });
+  for (let i = 0; i < 60 && !pdfBase64; i++) {
+    pdfBase64 = await browser.runtime.sendMessage({ type: "pdfFor", number: invoice.invoiceNumber });
     if (!pdfBase64) await sleep(500);
   }
   await browser.runtime.sendMessage({

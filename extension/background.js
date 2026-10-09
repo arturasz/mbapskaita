@@ -2,7 +2,7 @@
 const MB = "https://mb.rezvart.com";
 const PDF_URLS = ["https://s3.eu-west-1.amazonaws.com/api-prod.letsdeel.com/file-service/*"];
 
-let lastPdf = null; // { at, base64 }
+const pdfs = new Map(); // invoice number -> base64
 let collected = []; // invoices ready to send
 
 function toBase64(bytes) {
@@ -31,7 +31,9 @@ browser.webRequest.onBeforeRequest.addListener(
         offset += c.length;
       }
       const isPdf = String.fromCharCode(...bytes.subarray(0, 4)) === "%PDF";
-      if (isPdf) lastPdf = { at: Date.now(), base64: toBase64(bytes) };
+      // The signed URL carries the file name, e.g. ..._INV-9vgkwe8-2026-10_Sep1-Sep30.pdf
+      const number = decodeURIComponent(details.url).match(/(INV-[A-Za-z0-9-]+)_/)?.[1];
+      if (isPdf && number) pdfs.set(number, toBase64(bytes));
     };
   },
   { urls: PDF_URLS },
@@ -58,8 +60,8 @@ async function upload(token) {
 
 browser.runtime.onMessage.addListener((msg) => {
   switch (msg.type) {
-    case "pdfSince":
-      return Promise.resolve(lastPdf && lastPdf.at >= msg.since ? lastPdf.base64 : null);
+    case "pdfFor":
+      return Promise.resolve(pdfs.get(msg.number) ?? null);
     case "collect":
       collected = collected.filter((i) => i.invoiceNumber !== msg.invoice.invoiceNumber);
       collected.push(msg.invoice);
