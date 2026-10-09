@@ -33,3 +33,5 @@ dist-ssr
 skills-lock.json
 .agents
 examples-do-not-commit
+extension-signed
+web-ext-artifacts

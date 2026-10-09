@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MB apskaita \u2013 Deel helper",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Step-by-step helper that collects Deel invoices (data + PDF) and sends them to mb.rezvart.com.",
   "permissions": [
     "storage",
@@ -35,7 +35,12 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "mb-deel-helper@rezvart.com"
+      "id": "mb-deel-helper@rezvart.com",
+      "data_collection_permissions": {
+        "required": [
+          "financialAndPaymentInfo"
+        ]
+      }
     }
   },
   "icons": {
