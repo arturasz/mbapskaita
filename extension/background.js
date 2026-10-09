@@ -4,6 +4,22 @@ const CONCURRENCY = 5;
 
 let collected = []; // invoices ready to send
 
+// Auth headers the Deel page itself sends to its API. Kept in memory, used only for app.deel.com.
+const SKIP_HEADERS = /^(cookie|host|user-agent|accept.*|content-.*|origin|referer|sec-.*|priority|connection|pragma|cache-control|dnt|te|if-.*|upgrade-.*)$/i;
+let deelHeaders = null;
+
+browser.webRequest.onBeforeSendHeaders.addListener(
+  (details) => {
+    const picked = {};
+    for (const h of details.requestHeaders) {
+      if (!SKIP_HEADERS.test(h.name)) picked[h.name] = h.value;
+    }
+    if (Object.keys(picked).length) deelHeaders = picked;
+  },
+  { urls: ["https://app.deel.com/deelapi/*"] },
+  ["requestHeaders"],
+);
+
 function toBase64(bytes) {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -31,7 +47,7 @@ async function collectAll(tabId, invoices, fromDate) {
       if (!invoice) return;
       try {
         if (!invoice.url) throw new Error("no link in list");
-        const info = await browser.tabs.sendMessage(tabId, { type: "fetchInvoice", url: invoice.url });
+        const info = await browser.tabs.sendMessage(tabId, { type: "fetchInvoice", url: invoice.url, headers: deelHeaders });
         if (!fromDate || info.issueDate >= fromDate) {
           const pdfBase64 = await downloadPdf(info.pdfUrl);
           const { url, ...rest } = invoice;
@@ -88,6 +104,8 @@ browser.runtime.onMessage.addListener((msg) => {
       });
     case "upload":
       return upload(msg.token);
+    case "hasHeaders":
+      return Promise.resolve(!!deelHeaders);
     case "reset":
       collected = [];
       return Promise.resolve(0);

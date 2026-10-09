@@ -69,8 +69,8 @@ async function readList() {
 }
 
 // Same-origin calls to Deel's own API (uses your logged-in session).
-async function deelJson(path) {
-  const res = await fetch(new URL(path, location.origin).href, { credentials: "include", headers: { Accept: "application/json" } });
+async function deelJson(path, headers) {
+  const res = await fetch(new URL(path, location.origin).href, { credentials: "include", headers: { Accept: "application/json", ...headers } });
   if (!res.ok) throw new Error(`Deel API ${res.status} for ${path.split("?")[0]}`);
   return res.json();
 }
@@ -78,11 +78,11 @@ async function deelJson(path) {
 const vilniusDate = (iso) =>
   new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Vilnius" }); // YYYY-MM-DD
 
-async function fetchInvoice(url) {
+async function fetchInvoice(url, headers) {
   const publicId = new URL(url).pathname.split("/").filter(Boolean).pop();
   const [info, pdf] = await Promise.all([
-    deelJson(`/deelapi/invoices/${publicId}/extended`),
-    deelJson(`/deelapi/invoices/${publicId}/pdf?noredirect`),
+    deelJson(`/deelapi/invoices/${publicId}/extended`, headers),
+    deelJson(`/deelapi/invoices/${publicId}/pdf?noredirect`, headers),
   ]);
   return {
     issueDate: vilniusDate(info.issuedAt),
@@ -96,6 +96,6 @@ async function fetchInvoice(url) {
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === "readList") return readList();
-  if (msg.type === "fetchInvoice") return fetchInvoice(msg.url);
+  if (msg.type === "fetchInvoice") return fetchInvoice(msg.url, msg.headers);
   return undefined;
 });

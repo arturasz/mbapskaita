@@ -6,6 +6,7 @@
   "permissions": [
     "storage",
     "tabs",
+    "webRequest",
     "https://app.deel.com/*",
     "https://s3.eu-west-1.amazonaws.com/*",
     "https://mb.rezvart.com/*"

@@ -57,6 +57,16 @@ $("sync").onclick = async () => {
     log("Reading invoice list…");
     const list = (await readList(tab.id)).filter((i) => i.status === "paid");
 
+    // The add-on learns Deel's request headers from the page's own calls; reload once if needed.
+    if (!(await browser.runtime.sendMessage({ type: "hasHeaders" }))) {
+      log("Refreshing Deel tab…");
+      await browser.tabs.reload(tab.id);
+      for (let i = 0; i < 60 && !(await browser.runtime.sendMessage({ type: "hasHeaders" })); i++) {
+        await sleep(500);
+      }
+      await readList(tab.id); // wait until the reloaded page answers again
+    }
+
     log(`Collecting ${list.length} paid invoices…`);
     await browser.runtime.sendMessage({ type: "reset" });
     const failed = await browser.runtime.sendMessage({
