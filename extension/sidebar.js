@@ -44,6 +44,51 @@ async function readList(tabId) {
   throw new Error("Could not read the Deel invoice list. Are you logged in to Deel?");
 }
 
+// Shared first part: tab, list, headers.
+async function prepare() {
+  log("Opening Deel…");
+  const tab = await deelListTab();
+  log("Reading invoice list…");
+  const list = (await readList(tab.id)).filter((i) => i.status === "paid");
+  // The add-on learns Deel's request headers from the page's own calls; reload once if needed.
+  if (!(await browser.runtime.sendMessage({ type: "hasHeaders" }))) {
+    log("Refreshing Deel tab…");
+    await browser.tabs.reload(tab.id);
+    for (let i = 0; i < 60 && !(await browser.runtime.sendMessage({ type: "hasHeaders" })); i++) {
+      await sleep(500);
+    }
+    await readList(tab.id); // wait until the reloaded page answers again
+  }
+  return { tab, list };
+}
+
+// Dry run: 2 API calls for the newest invoice, nothing uploaded.
+$("try").onclick = async () => {
+  $("try").disabled = true;
+  try {
+    const { tab, list } = await prepare();
+    if (!list.length) throw new Error("No paid invoices in the list.");
+    await browser.runtime.sendMessage({ type: "reset" });
+    const failed = await browser.runtime.sendMessage({
+      type: "collect-many",
+      tabId: tab.id,
+      invoices: list.slice(0, 1),
+      fromDate: null,
+    });
+    const status = await browser.runtime.sendMessage({ type: "status" });
+    await browser.runtime.sendMessage({ type: "reset" });
+    log(
+      status.count
+        ? `Try OK (nothing sent):\n${status.summary.join("\n")}\nNow press the big button.`
+        : `Try failed:\n${failed.join("\n")}`,
+    );
+  } catch (err) {
+    log(String(err.message ?? err));
+  } finally {
+    $("try").disabled = false;
+  }
+};
+
 $("sync").onclick = async () => {
   $("sync").disabled = true;
   try {
@@ -52,20 +97,7 @@ $("sync").onclick = async () => {
     const fromDate = $("from").value || null;
     await browser.storage.local.set({ from: fromDate ?? "" });
 
-    log("Opening Deel…");
-    const tab = await deelListTab();
-    log("Reading invoice list…");
-    const list = (await readList(tab.id)).filter((i) => i.status === "paid");
-
-    // The add-on learns Deel's request headers from the page's own calls; reload once if needed.
-    if (!(await browser.runtime.sendMessage({ type: "hasHeaders" }))) {
-      log("Refreshing Deel tab…");
-      await browser.tabs.reload(tab.id);
-      for (let i = 0; i < 60 && !(await browser.runtime.sendMessage({ type: "hasHeaders" })); i++) {
-        await sleep(500);
-      }
-      await readList(tab.id); // wait until the reloaded page answers again
-    }
+    const { tab, list } = await prepare();
 
     log(`Collecting ${list.length} paid invoices…`);
     await browser.runtime.sendMessage({ type: "reset" });

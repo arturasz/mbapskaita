@@ -6,7 +6,8 @@
       body { font: 13px system-ui, sans-serif; margin: 12px; }
       .box { border: 1px solid #8884; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
       button { padding: 8px 12px; }
-      #sync { width: 100%; font-size: 14px; font-weight: 600; }
+      #sync, #try { width: 100%; margin-bottom: 6px; }
+      #sync { font-size: 14px; font-weight: 600; }
       #log { white-space: pre-wrap; color: #888; user-select: text; margin-top: 8px; }
       input[type=password] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
       .hidden { display: none; }
@@ -22,6 +23,7 @@
       <label>Only invoices issued from <input type="date" id="from" /></label>
       <div>Empty = all. You must be logged in to Deel.</div>
     </div>
+    <button id="try">Try sync (newest invoice only, nothing sent)</button>
     <button id="sync">Sync Deel invoices to MB</button>
     <div id="log"></div>
     <button id="copy">Copy log</button>

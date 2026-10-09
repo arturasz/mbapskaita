@@ -1,6 +1,6 @@
 // Collects invoices (data + PDF) over Deel's API and uploads them to the MB inbox.
 const MB = "https://mb.rezvart.com";
-const CONCURRENCY = 5;
+const CONCURRENCY = 3;
 
 let collected = []; // invoices ready to send
 
@@ -36,15 +36,17 @@ async function downloadPdf(url) {
   return toBase64(bytes);
 }
 
-async function collectAll(tabId, invoices, fromDate) {
+async function collectAll(tabId, allInvoices, fromDate) {
+  let invoices = allInvoices;
   const failed = [];
   let next = 0;
   let finished = 0;
+  let aborted = false; // first error stops everything: never repeat failing requests against Deel
 
   const worker = async () => {
     for (;;) {
       const invoice = invoices[next++];
-      if (!invoice) return;
+      if (!invoice || aborted) return;
       try {
         if (!invoice.url) throw new Error("no link in list");
         const info = await browser.tabs.sendMessage(tabId, { type: "fetchInvoice", url: invoice.url, headers: deelHeaders });
@@ -62,7 +64,8 @@ async function collectAll(tabId, invoices, fromDate) {
           });
         }
       } catch (err) {
-        failed.push(`${invoice.invoiceNumber}: ${err.message}`);
+        aborted = true;
+        failed.push(`${invoice.invoiceNumber}: ${err.message}\nStopped after the first error.`);
       }
       finished++;
       browser.runtime
@@ -71,7 +74,17 @@ async function collectAll(tabId, invoices, fromDate) {
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, invoices.length) }, worker));
+  // First invoice alone: if Deel rejects it, nothing else is sent.
+  const first = invoices.slice(0, 1);
+  const rest = invoices.slice(1);
+  invoices = first;
+  next = 0;
+  await worker();
+  if (!aborted && rest.length) {
+    invoices = rest;
+    next = 0;
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rest.length) }, worker));
+  }
   return failed;
 }
 
@@ -101,6 +114,9 @@ browser.runtime.onMessage.addListener((msg) => {
       return Promise.resolve({
         count: collected.length,
         withPdf: collected.filter((i) => i.pdfBase64).length,
+        summary: collected.map(
+          (i) => `${i.invoiceNumber}: ${i.issueDate}, ${i.amount} ${i.currency}, ${i.client}, PDF ${Math.round(((i.pdfBase64?.length ?? 0) * 3) / 4 / 1024)} KB`,
+        ),
       });
     case "upload":
       return upload(msg.token);
