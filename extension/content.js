@@ -70,7 +70,7 @@ async function readList() {
 
 // Same-origin calls to Deel's own API (uses your logged-in session).
 async function deelJson(path) {
-  const res = await fetch(path, { credentials: "include", headers: { Accept: "application/json" } });
+  const res = await fetch(new URL(path, location.origin).href, { credentials: "include", headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`Deel API ${res.status} for ${path.split("?")[0]}`);
   return res.json();
 }
