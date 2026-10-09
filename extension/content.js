@@ -87,7 +87,7 @@ function readIssueDate() {
   return month ? `${m[3]}-${String(month).padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
 }
 
-async function collectOne(invoice) {
+async function collectOne(invoice, fromDate) {
   const row = await findRow(invoice.invoiceNumber);
   if (!row) throw new Error("row not found");
   const target = row.querySelector('[data-qa="work-period"]') ?? row;
@@ -99,6 +99,14 @@ async function collectOne(invoice) {
     const snippet = document.body.innerText.replace(/\s+/g, " ").slice(0, 160);
     throw new Error(`issue date not found at ${location.pathname} :: ${snippet}`);
   }
+  const goBack = async () => {
+    document.querySelector('[data-qa="page-header-secondary-back-button"]')?.click();
+    await waitFor(() => rowEls().length > 0);
+  };
+  if (fromDate && issueDate < fromDate) {
+    await goBack();
+    return { issueDate, tooOld: true };
+  }
   let pdfBase64 = null;
   for (let i = 0; i < 60 && !pdfBase64; i++) {
     pdfBase64 = await browser.runtime.sendMessage({ type: "pdfFor", number: invoice.invoiceNumber });
@@ -108,20 +116,25 @@ async function collectOne(invoice) {
     type: "collect",
     invoice: { ...invoice, issueDate, pdfBase64 },
   });
-  document.querySelector('[data-qa="page-header-secondary-back-button"]')?.click();
-  await waitFor(() => rowEls().length > 0);
+  await goBack();
   return { issueDate, hasPdf: !!pdfBase64 };
 }
 
-async function collectMany(invoices) {
+async function collectMany(invoices, fromDate) {
   const failed = [];
+  let older = 0; // list is newest first: stop after two invoices older than fromDate
   for (const [i, invoice] of invoices.entries()) {
     browser.runtime.sendMessage({
       type: "progress",
       text: `${i + 1}/${invoices.length} ${invoice.invoiceNumber}`,
     });
     try {
-      const result = await collectOne(invoice);
+      const result = await collectOne(invoice, fromDate);
+      if (result.tooOld) {
+        if (++older >= 2) break;
+        continue;
+      }
+      older = 0;
       if (!result.hasPdf) failed.push(`${invoice.invoiceNumber}: no PDF captured`);
     } catch (err) {
       failed.push(`${invoice.invoiceNumber}: ${err.message}`);
@@ -132,6 +145,6 @@ async function collectMany(invoices) {
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === "readList") return readList();
-  if (msg.type === "collect-many") return collectMany(msg.invoices);
+  if (msg.type === "collect-many") return collectMany(msg.invoices, msg.fromDate);
   return undefined;
 });

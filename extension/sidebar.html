@@ -26,10 +26,8 @@
     </div>
     <div class="step" id="s2">
       <h3>2. Read invoice list</h3>
-      <div>Collect paid invoices:</div>
-      <label><input type="radio" name="count" value="3" checked /> last 3</label>
-      <label><input type="radio" name="count" value="12" /> last 12</label>
-      <label><input type="radio" name="count" value="999" /> all</label><br />
+      <label>Collect paid invoices issued from <input type="date" id="from" /></label>
+      <div>Empty = all.</div>
       <button id="read">Read list</button>
     </div>
     <div class="step" id="s3">

@@ -42,9 +42,9 @@ $("read").onclick = async () => {
     const tab = await deelTab();
     log("Reading list…");
     const all = await browser.tabs.sendMessage(tab.id, { type: "readList" });
-    const paid = all.filter((i) => i.status === "paid").slice(0, Number(document.querySelector("input[name=count]:checked").value));
+    const paid = all.filter((i) => i.status === "paid");
     selected = paid;
-    log(`Found ${all.length}, will collect ${paid.length} paid:\n` + paid.map((i) => i.invoiceNumber).join("\n"));
+    log(`Found ${all.length}, ${paid.length} paid, checking dates from the newest:\n` + paid.map((i) => i.invoiceNumber).join("\n"));
     $("collect").disabled = paid.length === 0;
     done("s2");
   } catch (err) {
@@ -56,7 +56,7 @@ $("collect").onclick = async () => {
   try {
     const tab = await deelTab();
     $("collect").disabled = true;
-    const failed = await browser.tabs.sendMessage(tab.id, { type: "collect-many", invoices: selected });
+    const failed = await browser.tabs.sendMessage(tab.id, { type: "collect-many", invoices: selected, fromDate: $("from").value || null });
     const status = await browser.runtime.sendMessage({ type: "status" });
     log(`Collected ${status.count} (${status.withPdf} with PDF).` + (failed.length ? `\nProblems:\n${failed.join("\n")}` : ""));
     $("send").disabled = status.count === 0;
