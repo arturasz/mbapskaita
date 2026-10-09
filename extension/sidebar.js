@@ -80,3 +80,8 @@ $("send").onclick = async () => {
 $("openMb").onclick = () => browser.tabs.create({ url: "https://mb.rezvart.com/income" });
 
 $("copy").onclick = () => navigator.clipboard.writeText($("log").textContent);
+$("apiClear").onclick = async () => {
+  await browser.runtime.sendMessage({ type: "apiLogClear" });
+  log("Cleared. Reload an invoice page in Deel, then click Show.");
+};
+$("apiShow").onclick = async () => log(await browser.runtime.sendMessage({ type: "apiLog" }));

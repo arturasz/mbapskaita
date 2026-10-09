@@ -67,8 +67,11 @@ function waitTabComplete(tabId, timeout = 15000) {
       browser.tabs.onUpdated.removeListener(listener);
       resolve();
     };
+    let sawLoading = false; // ignore a "complete" left over from the previous page
     const listener = (id, info) => {
-      if (id === tabId && info.status === "complete") finish();
+      if (id !== tabId) return;
+      if (info.status === "loading") sawLoading = true;
+      if (info.status === "complete" && sawLoading) finish();
     };
     const timer = setTimeout(finish, timeout);
     browser.tabs.onUpdated.addListener(listener);
@@ -188,3 +191,62 @@ browser.runtime.onMessage.addListener((msg) => {
 
 // Toolbar icon opens the side panel.
 browser.browserAction.onClicked.addListener(() => browser.sidebarAction.toggle());
+
+// --- API discovery: records the shape (never the values) of Deel's JSON calls ---
+const apiLog = [];
+const DATE_LIKE = /^\d{4}-\d{2}-\d{2}|^[A-Z][a-z]+ \d{1,2}, \d{4}/;
+
+function shape(value, depth) {
+  if (Array.isArray(value)) return depth > 0 && value.length ? [shape(value[0], depth - 1)] : "array";
+  if (value && typeof value === "object") {
+    if (depth === 0) return "object";
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shape(v, depth - 1)]));
+  }
+  if (typeof value === "string" && DATE_LIKE.test(value)) return `date-like: ${value}`;
+  return typeof value;
+}
+
+browser.webRequest.onBeforeRequest.addListener(
+  (details) => {
+    const filter = browser.webRequest.filterResponseData(details.requestId);
+    const chunks = [];
+    filter.ondata = (event) => {
+      chunks.push(new Uint8Array(event.data.slice(0)));
+      filter.write(event.data);
+    };
+    filter.onstop = () => {
+      filter.close();
+      try {
+        const size = chunks.reduce((n, c) => n + c.length, 0);
+        if (size > 400000) return;
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const c of chunks) {
+          bytes.set(c, offset);
+          offset += c.length;
+        }
+        const json = JSON.parse(new TextDecoder().decode(bytes));
+        const url = new URL(details.url);
+        apiLog.push({
+          call: `${details.method} ${url.pathname}`,
+          query: [...url.searchParams.keys()].join(","),
+          shape: shape(json, 3),
+        });
+        if (apiLog.length > 60) apiLog.shift();
+      } catch {
+        // not JSON
+      }
+    };
+  },
+  { urls: ["https://app.deel.com/*"], types: ["xmlhttprequest"] },
+  ["blocking"],
+);
+
+browser.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "apiLog") return Promise.resolve(JSON.stringify(apiLog, null, 1));
+  if (msg.type === "apiLogClear") {
+    apiLog.length = 0;
+    return Promise.resolve(true);
+  }
+  return undefined;
+});
