@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MB apskaita \u2013 Deel helper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Step-by-step helper that collects Deel invoices (data + PDF) and sends them to mb.rezvart.com.",
   "permissions": [
     "storage",

@@ -69,23 +69,29 @@ async function readList() {
 }
 
 // Same-origin calls to Deel's own API (uses your logged-in session).
-async function deelJson(path, headers) {
+async function deelFetch(path, headers) {
   const res = await fetch(new URL(path, location.origin).href, {
     credentials: "include",
-    headers: { Accept: "application/json", ...headers },
+    headers: { Accept: "application/json, application/pdf", ...headers },
   });
-  const text = await res.text();
-  const where = path.split("?")[0].replace(/\/invoices\/[^/]+/, "/invoices/<id>");
-  if (!res.ok) throw new Error(`Deel API ${res.status} for ${where}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    const names = Object.keys(headers ?? {}).join(",") || "none";
-    throw new Error(
-      `Not JSON from ${where} (${res.status} ${res.headers.get("content-type")}, ` +
-        `sent headers: ${names}): ${text.replace(/\s+/g, " ").slice(0, 120)}`,
-    );
+  if (!res.ok) throw new Error(`Deel API ${res.status} for ${path.split("?")[0].replace(/\/invoices\/[^/]+/, "/invoices/<id>")}`);
+  return res;
+}
+
+function toBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
+  return btoa(binary);
+}
+
+// The pdf endpoint returns either the PDF itself or JSON { url } pointing at it.
+async function readPdfResponse(res) {
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (String.fromCharCode(...bytes.subarray(0, 4)) === "%PDF") return { pdfBase64: toBase64(bytes) };
+  const json = JSON.parse(new TextDecoder().decode(bytes));
+  return { pdfUrl: json.url };
 }
 
 const vilniusDate = (iso) =>
@@ -93,17 +99,15 @@ const vilniusDate = (iso) =>
 
 async function fetchInvoice(url, headers) {
   const publicId = new URL(url).pathname.split("/").filter(Boolean).pop();
-  const [info, pdf] = await Promise.all([
-    deelJson(`/deelapi/invoices/${publicId}/extended`, headers),
-    deelJson(`/deelapi/invoices/${publicId}/pdf?noredirect`, headers),
-  ]);
+  const info = await (await deelFetch(`/deelapi/invoices/${publicId}/extended`, headers)).json();
+  const pdf = await readPdfResponse(await deelFetch(`/deelapi/invoices/${publicId}/pdf?noredirect`, headers));
   return {
     issueDate: vilniusDate(info.issuedAt),
     amount: parseFloat(info.total),
     currency: info.currency,
     status: info.status,
     client: info.client?.displayName ?? info.client?.name,
-    pdfUrl: pdf.url,
+    ...pdf,
   };
 }
 

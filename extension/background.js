@@ -51,7 +51,7 @@ async function collectAll(tabId, allInvoices, fromDate) {
         if (!invoice.url) throw new Error("no link in list");
         const info = await browser.tabs.sendMessage(tabId, { type: "fetchInvoice", url: invoice.url, headers: deelHeaders });
         if (!fromDate || info.issueDate >= fromDate) {
-          const pdfBase64 = await downloadPdf(info.pdfUrl);
+          const pdfBase64 = info.pdfBase64 ?? (await downloadPdf(info.pdfUrl));
           const { url, ...rest } = invoice;
           collected = collected.filter((c) => c.invoiceNumber !== invoice.invoiceNumber);
           collected.push({
