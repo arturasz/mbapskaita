@@ -124,3 +124,5 @@ $("sync").onclick = async () => {
 };
 
 $("copy").onclick = () => navigator.clipboard.writeText($("log").textContent);
+
+$("version").textContent = `Add-on version ${browser.runtime.getManifest().version}`;
