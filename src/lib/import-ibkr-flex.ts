@@ -79,9 +79,9 @@ export function parseFlexCsv(csv: string): FlexReport {
   const report: FlexReport = { trades: [], cash: [] };
   let header: string[] | null = null;
 
-  for (const row of parseCSV(csv)) {
+  for (const row of parseCSV(csv.replace(/^\uFEFF/, ""))) {
     if (row.length < 2) continue;
-    if (row[0] === "ClientAccountID" || (row[0] === "Date/Time" && row[1] === "FromCurrency")) {
+    if (row[0].trim() === "ClientAccountID" || (row[0] === "Date/Time" && row[1] === "FromCurrency")) {
       header = row;
       continue;
     }

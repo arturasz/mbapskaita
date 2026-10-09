@@ -123,7 +123,7 @@ export function InvestmentsPage() {
         allInvestments.push(...parsed);
       } else {
         const text = await file.text();
-        if (text.startsWith('"ClientAccountID"')) {
+        if (text.includes("ClientAccountID")) {
           await importFlexCsv(text); // Flex Query export
           flexHandled = true;
           continue;
