@@ -6,7 +6,7 @@ async function waitFor(fn, timeout = 15000) {
   while (Date.now() - start < timeout) {
     const value = fn();
     if (value) return value;
-    await sleep(200);
+    await sleep(100);
   }
   return null;
 }
