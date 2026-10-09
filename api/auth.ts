@@ -4,7 +4,7 @@ import {
   createSession,
   isAuthenticated,
   verifyGoogleCredential,
-} from "./_lib/auth";
+} from "./_lib/auth.js";
 
 type Req = IncomingMessage & { body?: { credential?: string } };
 

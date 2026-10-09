@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { neon } from "@neondatabase/serverless";
-import { isAuthenticated } from "./_lib/auth";
+import { isAuthenticated } from "./_lib/auth.js";
 
 type Req = IncomingMessage & { body?: unknown; query: Record<string, string> };
 
