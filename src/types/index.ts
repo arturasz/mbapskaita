@@ -74,6 +74,19 @@ export interface Investment {
   salePriceEur?: number;
   quantity: number;
   broker: string;
+  externalId?: string; // broker trade id of the buy (idempotent re-import)
+  saleExternalId?: string; // broker trade id of the sale that closed this lot
+}
+
+export interface Dividend {
+  id: string; // broker transaction id
+  date: string; // ISO date
+  symbol: string;
+  kind: "dividend" | "withholding";
+  amount: number; // original currency, negative for withholding
+  currency: Currency;
+  amountEur: number;
+  description: string;
 }
 
 // --- Tax configuration ---

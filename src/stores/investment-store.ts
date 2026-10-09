@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Investment } from "../types";
 import { storage } from "../storage";
+import { applyFlexTrades } from "../lib/import-ibkr-flex";
+import type { FlexTrade, ToEur } from "../lib/import-ibkr-flex";
 
 const STORAGE_KEY = "investments";
 
@@ -27,6 +29,7 @@ interface InvestmentStore {
   hydrate: () => Promise<void>;
   add: (investment: Investment) => Promise<void>;
   importBatch: (items: Investment[]) => Promise<ImportResult>;
+  syncFlex: (trades: FlexTrade[], toEur: ToEur) => Promise<{ added: number; closed: number; warnings: string[] }>;
   update: (id: string, investment: Partial<Investment>) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
@@ -66,6 +69,15 @@ export const useInvestmentStore = create<InvestmentStore>((set, get) => ({
     }
 
     return { added: toAdd.length, skipped };
+  },
+
+  syncFlex: async (trades, toEur) => {
+    const result = await applyFlexTrades(get().investments, trades, toEur);
+    if (result.added > 0 || result.closed > 0) {
+      set({ investments: result.investments });
+      await storage.set(STORAGE_KEY, result.investments);
+    }
+    return { added: result.added, closed: result.closed, warnings: result.warnings };
   },
 
   update: async (id, partial) => {

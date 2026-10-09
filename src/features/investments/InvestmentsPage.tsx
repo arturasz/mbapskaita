@@ -8,6 +8,9 @@ import type { ImportResult } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { calculateInvestmentGains, totalInvestmentTax } from "../../lib/investments";
 import { parseIBKRActivityStatement } from "../../lib/import-ibkr";
+import { useDividendStore } from "../../stores/dividend-store";
+import { parseFlexCsv, flexDividends } from "../../lib/import-ibkr-flex";
+import { convertToEur } from "../../lib/currency";
 import { parseIBKRPDF } from "../../lib/import-ibkr-pdf";
 import type { Investment, Currency } from "../../types";
 
@@ -29,11 +32,17 @@ const emptyForm = {
 };
 
 export function InvestmentsPage() {
-  const { investments, loaded, hydrate, add, update, importBatch, remove } = useInvestmentStore();
+  const { investments, loaded, hydrate, add, update, importBatch, syncFlex, remove } = useInvestmentStore();
+  const dividendStore = useDividendStore();
+  const [fetching, setFetching] = useState(false);
   const { settings, loaded: sl, hydrate: hs } = useSettingsStore();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dividendStore.loaded) dividendStore.hydrate();
+  }, [dividendStore]);
 
   useEffect(() => {
     if (!loaded) hydrate();
@@ -79,6 +88,25 @@ export function InvestmentsPage() {
     setForm(emptyForm);
     setEditingId(null);
     setShowForm(false);
+  };
+
+  const fetchFromIBKR = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch("/api/ibkr");
+      if (!res.ok) throw new Error(await res.text());
+      const report = parseFlexCsv(await res.text());
+      const trades = await syncFlex(report.trades, convertToEur);
+      const dividends = await flexDividends(report.cash, convertToEur);
+      const newDividends = await dividendStore.importBatch(dividends);
+      const parts = [`IBKR: nauji pirkimai ${trades.added}`, `parduota ${trades.closed}`, `dividendai ${newDividends}`];
+      if (trades.warnings.length) parts.push(`įspėjimai: ${trades.warnings.join("; ")}`);
+      setImportStatus(parts.join(", "));
+    } catch (err) {
+      setImportStatus(`IBKR klaida: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setFetching(false);
+    }
   };
 
   const handleIBKRFiles = async (files: File[]) => {
@@ -141,6 +169,13 @@ export function InvestmentsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Investicijos ({year})</h1>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={fetchFromIBKR}
+            disabled={fetching}
+            className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
+          >
+            {fetching ? "Gaunama…" : "Gauti iš IBKR"}
+          </button>
           <FileImport label="IBKR failai" onFiles={handleIBKRFiles} />
           <DirectoryImport label="IBKR katalogas" onFiles={handleIBKRFiles} />
           <button
@@ -319,6 +354,29 @@ export function InvestmentsPage() {
                   </button>
                 </span>
               ),
+            },
+          ]}
+        />
+      </Card>
+
+      <Card title="Dividendai ir išskaitytas mokestis">
+        <Table
+          data={dividendStore.dividends}
+          keyFn={(d) => d.id}
+          emptyMessage="Dar nėra dividendų"
+          columns={[
+            { key: "date", header: "Data", render: (d) => d.date },
+            { key: "symbol", header: "Turtas", render: (d) => d.symbol },
+            {
+              key: "kind",
+              header: "Tipas",
+              render: (d) => (d.kind === "dividend" ? "Dividendas" : "Išskaitytas mokestis"),
+            },
+            {
+              key: "amount",
+              header: "Suma",
+              render: (d) => `${d.amount.toFixed(2)} ${d.currency} (${d.amountEur.toFixed(2)} EUR)`,
+              className: "text-right",
             },
           ]}
         />
