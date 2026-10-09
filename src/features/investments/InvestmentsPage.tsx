@@ -90,18 +90,22 @@ export function InvestmentsPage() {
     setShowForm(false);
   };
 
-  const fetchFromIBKR = async () => {
-    setFetching(true);
-    try {
-      const res = await fetch("/api/ibkr");
-      if (!res.ok) throw new Error(await res.text());
-      const report = parseFlexCsv(await res.text());
+  const importFlexCsv = async (csv: string) => {
+      const report = parseFlexCsv(csv);
       const trades = await syncFlex(report.trades, convertToEur);
       const dividends = await flexDividends(report.cash, convertToEur);
       const newDividends = await dividendStore.importBatch(dividends);
       const parts = [`IBKR: nauji pirkimai ${trades.added}`, `parduota ${trades.closed}`, `dividendai ${newDividends}`];
       if (trades.warnings.length) parts.push(`įspėjimai: ${trades.warnings.join("; ")}`);
       setImportStatus(parts.join(", "));
+  };
+
+  const fetchFromIBKR = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch("/api/ibkr");
+      if (!res.ok) throw new Error(await res.text());
+      await importFlexCsv(await res.text());
     } catch (err) {
       setImportStatus(`IBKR klaida: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -111,6 +115,7 @@ export function InvestmentsPage() {
 
   const handleIBKRFiles = async (files: File[]) => {
     const allInvestments: Investment[] = [];
+    let flexHandled = false;
 
     for (const file of files) {
       if (file.name.toLowerCase().endsWith(".pdf")) {
@@ -118,12 +123,18 @@ export function InvestmentsPage() {
         allInvestments.push(...parsed);
       } else {
         const text = await file.text();
+        if (text.startsWith('"ClientAccountID"')) {
+          await importFlexCsv(text); // Flex Query export
+          flexHandled = true;
+          continue;
+        }
         const parsed = await parseIBKRActivityStatement(text);
         allInvestments.push(...parsed);
       }
     }
 
     if (allInvestments.length === 0) {
+      if (flexHandled) return;
       setImportStatus("Nepavyko rasti sandorių failuose");
       setTimeout(() => setImportStatus(null), 4000);
       return;
