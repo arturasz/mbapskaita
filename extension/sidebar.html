@@ -9,7 +9,8 @@
       h3 { margin: 0 0 6px; font-size: 13px; }
       button { padding: 6px 10px; margin-top: 6px; }
       #log { white-space: pre-wrap; color: #888; }
-      input { width: 100%; box-sizing: border-box; }
+      input[type=password] { width: 100%; box-sizing: border-box; }
+      #log { user-select: text; }
     </style>
   </head>
   <body>
@@ -25,7 +26,10 @@
     </div>
     <div class="step" id="s2">
       <h3>2. Read invoice list</h3>
-      <label>Collect <select id="count"><option value="3">last 3</option><option value="12">last 12</option><option value="999">all</option></select> paid invoices</label><br />
+      <div>Collect paid invoices:</div>
+      <label><input type="radio" name="count" value="3" checked /> last 3</label>
+      <label><input type="radio" name="count" value="12" /> last 12</label>
+      <label><input type="radio" name="count" value="999" /> all</label><br />
       <button id="read">Read list</button>
     </div>
     <div class="step" id="s3">
@@ -38,6 +42,7 @@
       <button id="send" disabled>Send</button>
       <button id="openMb" disabled>Open MB &rarr; Income</button>
     </div>
+    <button id="copy">Copy log</button>
     <div id="log"></div>
     <script src="sidebar.js"></script>
   </body>

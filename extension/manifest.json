@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "MB apskaita – Deel helper",
+  "name": "MB apskaita \u2013 Deel helper",
   "version": "0.1.0",
   "description": "Step-by-step helper that collects Deel invoices (data + PDF) and sends them to mb.rezvart.com.",
   "permissions": [
@@ -12,16 +12,39 @@
     "https://s3.eu-west-1.amazonaws.com/api-prod.letsdeel.com/*",
     "https://mb.rezvart.com/*"
   ],
-  "background": { "scripts": ["background.js"] },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
   "content_scripts": [
-    { "matches": ["https://app.deel.com/*"], "js": ["content.js"], "run_at": "document_idle" }
+    {
+      "matches": [
+        "https://app.deel.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
   ],
   "sidebar_action": {
     "default_title": "MB Deel",
     "default_panel": "sidebar.html",
-    "open_at_install": true
+    "open_at_install": false,
+    "default_icon": "icon.svg"
   },
   "browser_specific_settings": {
-    "gecko": { "id": "mb-deel-helper@rezvart.com" }
+    "gecko": {
+      "id": "mb-deel-helper@rezvart.com"
+    }
+  },
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
+  },
+  "browser_action": {
+    "default_icon": "icon.svg",
+    "default_title": "MB Deel helper"
   }
 }

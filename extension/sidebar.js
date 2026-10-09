@@ -42,7 +42,7 @@ $("read").onclick = async () => {
     const tab = await deelTab();
     log("Reading list…");
     const all = await browser.tabs.sendMessage(tab.id, { type: "readList" });
-    const paid = all.filter((i) => i.status === "paid").slice(0, Number($("count").value));
+    const paid = all.filter((i) => i.status === "paid").slice(0, Number(document.querySelector("input[name=count]:checked").value));
     selected = paid;
     log(`Found ${all.length}, will collect ${paid.length} paid:\n` + paid.map((i) => i.invoiceNumber).join("\n"));
     $("collect").disabled = paid.length === 0;
@@ -78,3 +78,5 @@ $("send").onclick = async () => {
 };
 
 $("openMb").onclick = () => browser.tabs.create({ url: "https://mb.rezvart.com/income" });
+
+$("copy").onclick = () => navigator.clipboard.writeText($("log").textContent);

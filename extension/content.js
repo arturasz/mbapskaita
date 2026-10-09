@@ -81,7 +81,7 @@ async function findRow(number) {
 const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
 
 function readIssueDate() {
-  const m = document.body.innerText.match(/Issue Date\s*\n?\s*([A-Za-z]+) (\d{1,2}), (\d{4})/);
+  const m = document.body.innerText.match(/Issue\s*Date[\s:]*([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
   if (!m) return null;
   const month = MONTHS.indexOf(m[1].toLowerCase()) + 1;
   return month ? `${m[3]}-${String(month).padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
@@ -91,9 +91,15 @@ async function collectOne(invoice) {
   const row = await findRow(invoice.invoiceNumber);
   if (!row) throw new Error("row not found");
   const since = Date.now();
-  row.click();
+  const target = row.querySelector('[data-qa="work-period"]') ?? row;
+  for (const type of ["mousedown", "mouseup", "click"]) {
+    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
   const issueDate = await waitFor(readIssueDate);
-  if (!issueDate) throw new Error("issue date not found");
+  if (!issueDate) {
+    const snippet = document.body.innerText.replace(/\s+/g, " ").slice(0, 160);
+    throw new Error(`issue date not found at ${location.pathname} :: ${snippet}`);
+  }
   let pdfBase64 = null;
   for (let i = 0; i < 40 && !pdfBase64; i++) {
     pdfBase64 = await browser.runtime.sendMessage({ type: "pdfSince", since });

@@ -78,3 +78,6 @@ browser.runtime.onMessage.addListener((msg) => {
       return undefined;
   }
 });
+
+// Toolbar icon opens the side panel.
+browser.browserAction.onClicked.addListener(() => browser.sidebarAction.toggle());
