@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px system-ui, sans-serif; margin: 12px; }
+      .step { border: 1px solid #8884; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+      .step.done { border-color: #2a7; }
+      h3 { margin: 0 0 6px; font-size: 13px; }
+      button { padding: 6px 10px; margin-top: 6px; }
+      #log { white-space: pre-wrap; color: #888; }
+      input { width: 100%; box-sizing: border-box; }
+    </style>
+  </head>
+  <body>
+    <div class="step" id="s0">
+      <h3>0. Inbox token (once)</h3>
+      <input id="token" type="password" placeholder="paste inbox token" />
+      <button id="saveToken">Save</button>
+    </div>
+    <div class="step" id="s1">
+      <h3>1. Open Deel invoices</h3>
+      <div>Log in yourself if asked.</div>
+      <button id="open">Open Deel</button>
+    </div>
+    <div class="step" id="s2">
+      <h3>2. Read invoice list</h3>
+      <label>Collect <select id="count"><option value="3">last 3</option><option value="12">last 12</option><option value="999">all</option></select> paid invoices</label><br />
+      <button id="read">Read list</button>
+    </div>
+    <div class="step" id="s3">
+      <h3>3. Open each invoice</h3>
+      <div>Keep this tab in front until it finishes.</div>
+      <button id="collect" disabled>Collect invoices + PDFs</button>
+    </div>
+    <div class="step" id="s4">
+      <h3>4. Send to MB</h3>
+      <button id="send" disabled>Send</button>
+      <button id="openMb" disabled>Open MB &rarr; Income</button>
+    </div>
+    <div id="log"></div>
+    <script src="sidebar.js"></script>
+  </body>
+</html>

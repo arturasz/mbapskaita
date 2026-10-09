@@ -33,6 +33,7 @@ export interface Income {
   client: string;
   sourceCountry: IncomeSourceCountry;
   invoiceNumber?: string;
+  fileId?: string; // stored invoice PDF, served by /api/file
 }
 
 export interface Expense {

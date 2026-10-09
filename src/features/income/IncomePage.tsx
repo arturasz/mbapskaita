@@ -5,6 +5,7 @@ import { Badge } from "../../components/Badge";
 import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useIncomeStore } from "../../stores/income-store";
 import type { ImportResult } from "../../stores/income-store";
+import { InboxPanel } from "./InboxPanel";
 import { parseDeelCSV } from "../../lib/import-deel";
 import { parseDeelPDF } from "../../lib/import-deel-pdf";
 import { convertToEur } from "../../lib/currency";
@@ -161,6 +162,8 @@ export function IncomePage() {
           {importStatus}
         </div>
       )}
+
+      <InboxPanel />
 
       {showForm && (
         <Card title={editingId ? "Redaguoti pajamas" : "Naujos pajamos"}>
@@ -340,6 +343,16 @@ export function IncomePage() {
               header: "",
               render: (i) => (
                 <div className="flex gap-3">
+                  {i.fileId && (
+                    <a
+                      href={`/api/file?id=${i.fileId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      PDF
+                    </a>
+                  )}
                   <button
                     onClick={() => startEdit(i)}
                     className="text-sm text-blue-600 hover:text-blue-800"

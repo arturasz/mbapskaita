@@ -32,3 +32,4 @@ dist-ssr
 .env*
 skills-lock.json
 .agents
+examples-do-not-commit

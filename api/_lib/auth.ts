@@ -60,3 +60,9 @@ export async function isAuthenticated(req: IncomingMessage): Promise<boolean> {
     return false;
   }
 }
+
+/** The add-on token. It may only call /api/inbox. */
+export function hasInboxToken(req: IncomingMessage): boolean {
+  const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+  return !!bearer && bearer === env("INBOX_TOKEN");
+}
