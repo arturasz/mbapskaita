@@ -340,7 +340,7 @@ export function InvestmentsPage() {
               render: (inv) =>
                 inv.saleDate
                   ? `${inv.saleDate} — ${fmt(inv.salePriceEur ?? 0)}`
-                  : "Nepatdavinta",
+                  : "Neparduota",
             },
             {
               key: "actions",
