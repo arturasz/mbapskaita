@@ -33,7 +33,7 @@ export function DashboardPage() {
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
   const { investments, hydrate: hydrateInvestments, loaded: investmentsLoaded } = useInvestmentStore();
   const { dividends, hydrate: hydrateDividends, loaded: dividendsLoaded } = useDividendStore();
-  const { done: doneManual, loaded: doneLoaded, hydrate: hydrateDone, toggle: toggleDone } = useObligationStore();
+  const { done: doneManual, loaded: doneLoaded, hydrate: hydrateDone, toggle: toggleDone, markMany } = useObligationStore();
   const { payments: wisePayments, loaded: wiseLoaded, hydrate: hydrateWise } = useWiseStore();
   const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
@@ -271,7 +271,17 @@ export function DashboardPage() {
                         disabled={isAuto}
                         title={isAuto ? "Atpažinta automatiškai iš Wise išrašo" : "Pažymėti kaip atliktą"}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleDone(key, today)}
+                        onChange={(e) => {
+                          // A lump-sum Sodra payment covers earlier months too.
+                          const earlier = allObligations
+                            .filter((x) => x.name === o.name && x.dueDate < o.dueDate && !autoDone.has(obligationKey(x)))
+                            .map(obligationKey);
+                          if (e.target.checked && o.name === "PSD įmoka (privaloma)" && earlier.length > 0) {
+                            markMany([...earlier, key], today);
+                          } else {
+                            toggleDone(key, today);
+                          }
+                        }}
                         className="mt-1 h-4 w-4 shrink-0"
                       />
                       <div className="flex-1">

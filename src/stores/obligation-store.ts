@@ -9,6 +9,8 @@ interface ObligationStore {
   loaded: boolean;
   hydrate: () => Promise<void>;
   toggle: (key: string, today: string) => Promise<void>;
+  // Mark several at once (a lump-sum payment covers many months).
+  markMany: (keys: string[], today: string) => Promise<void>;
 }
 
 export const useObligationStore = create<ObligationStore>((set, get) => ({
@@ -23,6 +25,13 @@ export const useObligationStore = create<ObligationStore>((set, get) => ({
   toggle: async (key, today) => {
     const { [key]: was, ...rest } = get().done;
     const done = was ? rest : { ...rest, [key]: today };
+    set({ done });
+    await storage.set(STORAGE_KEY, done);
+  },
+
+  markMany: async (keys, today) => {
+    const done = { ...get().done };
+    for (const k of keys) done[k] ??= today;
     set({ done });
     await storage.set(STORAGE_KEY, done);
   },
