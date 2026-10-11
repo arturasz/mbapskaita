@@ -7,6 +7,7 @@ import { useExpenseStore } from "../../stores/expense-store";
 import type { ImportResult } from "../../stores/expense-store";
 import { parseExpenseCSV } from "../../lib/import-expenses";
 import { ReceiptDrop } from "./ReceiptDrop";
+import { WisePanel } from "./WisePanel";
 import { expenseCategories } from "../../data/expense-categories";
 import { convertToEur } from "../../lib/currency";
 import type { Expense, Currency, ExpenseCategory } from "../../types";
@@ -164,6 +165,7 @@ export function ExpensesPage() {
       )}
 
       <ReceiptDrop />
+      <WisePanel />
 
       {showForm && (
         <Card title={editingId ? "Redaguoti išlaidą" : "Nauja išlaida"}>
