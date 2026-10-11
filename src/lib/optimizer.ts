@@ -291,6 +291,7 @@ export function pvm101Obligations(year: number, pvmRegisteredFrom?: string): Obl
     const dueMonth = m === 12 ? 1 : m + 1;
     out.push({
       name: "PVM101 (SVS)",
+      period: `${year}-${String(m).padStart(2, "0")}`,
       description: `PVM101 už ${year}-${String(m).padStart(2, "0")} — tik jei buvo užsienio paslaugų pirkimų (pvz. OpenRouter, reklama) ar paslaugų ES verslui`,
       dueDate: `${dueYear}-${String(dueMonth).padStart(2, "0")}-25`,
       recurring: "monthly",

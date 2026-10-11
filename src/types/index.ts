@@ -248,6 +248,7 @@ export interface Obligation {
   dueDate: string;
   amount?: number;
   recurring: "monthly" | "quarterly" | "annual" | "once";
+  period?: string; // tax period the item covers (YYYY-MM), when it is not the due month
   category: "sodra" | "gpm" | "vat" | "declaration" | "other";
   steps: ObligationStep[];
 }

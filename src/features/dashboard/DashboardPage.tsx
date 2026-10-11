@@ -4,6 +4,7 @@ import { Card } from "../../components/Card";
 import { useIncomeStore } from "../../stores/income-store";
 import { useExpenseStore } from "../../stores/expense-store";
 import { useObligationStore } from "../../stores/obligation-store";
+import { doneFingerprint, encodeDone, pvm101ForMonth } from "../../lib/pvm101";
 import { useWiseStore } from "../../stores/wise-store";
 import { autoDonePsd, obligationKey } from "../../lib/obligation-status";
 import { useDividendStore } from "../../stores/dividend-store";
@@ -33,8 +34,8 @@ export function DashboardPage() {
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
   const { investments, hydrate: hydrateInvestments, loaded: investmentsLoaded } = useInvestmentStore();
   const { dividends, hydrate: hydrateDividends, loaded: dividendsLoaded } = useDividendStore();
-  const { done: doneManual, loaded: doneLoaded, hydrate: hydrateDone, toggle: toggleDone, markMany } = useObligationStore();
-  const { payments: wisePayments, loaded: wiseLoaded, hydrate: hydrateWise } = useWiseStore();
+  const { done: doneManual, loaded: doneLoaded, hydrate: hydrateDone, toggle: toggleDone, markMany, setDone } = useObligationStore();
+  const { payments: wisePayments, decisions: wiseDecisions, vatKinds, loaded: wiseLoaded, hydrate: hydrateWise } = useWiseStore();
   const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
   useEffect(() => {
@@ -129,6 +130,21 @@ export function DashboardPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const autoDone = useMemo(() => autoDonePsd(obligations, wisePayments), [obligations, wisePayments]);
+
+  // PVM101 per month, derived from Wise card payments and receipts.
+  const pvm101 = useMemo(() => {
+    const links: Record<string, string> = {};
+    for (const [id, d] of Object.entries(wiseDecisions)) if (d.status === "linked") links[id] = d.expenseId;
+    const byKey = new Map<string, ReturnType<typeof pvm101ForMonth>>();
+    for (const o of obligations) {
+      if (o.name !== "PVM101 (SVS)" || !o.period || !settings.pvmRegisteredFrom) continue;
+      byKey.set(
+        obligationKey(o),
+        pvm101ForMonth(o.period, wisePayments, expenses, links, vatKinds, settings.pvmRegisteredFrom),
+      );
+    }
+    return byKey;
+  }, [obligations, wisePayments, expenses, wiseDecisions, vatKinds, settings.pvmRegisteredFrom]);
 
   // Deduplicate by name+date, show all (past greyed out, upcoming normal)
   const allObligations = useMemo(() => {
@@ -258,8 +274,13 @@ export function DashboardPage() {
             <ul className="space-y-1 max-h-[600px] overflow-y-auto">
               {allObligations.map((o, i) => {
                 const key = obligationKey(o);
-                const isAuto = autoDone.has(key);
-                const isDone = isAuto || key in doneManual;
+                const month = pvm101.get(key);
+                const notRequired = month !== undefined && !month.required;
+                const manual = doneManual[key];
+                // A PVM101 ticked earlier reopens when new qualifying purchases appear.
+                const reopened = month?.required && manual !== undefined && doneFingerprint(manual) !== month.fingerprint;
+                const isAuto = autoDone.has(key) || notRequired;
+                const isDone = isAuto || (manual !== undefined && !reopened);
                 const overdue = !isDone && o.dueDate < today;
                 return (
                 <li key={i} className={isDone ? "opacity-50" : ""}>
@@ -276,6 +297,10 @@ export function DashboardPage() {
                           const earlier = allObligations
                             .filter((x) => x.name === o.name && x.dueDate < o.dueDate && !autoDone.has(obligationKey(x)))
                             .map(obligationKey);
+                          if (month?.required) {
+                            setDone(key, e.target.checked ? encodeDone(today, month.fingerprint) : null);
+                            return;
+                          }
                           if (e.target.checked && o.name === "PSD įmoka (privaloma)" && earlier.length > 0) {
                             markMany([...earlier, key], today);
                           } else {
@@ -287,7 +312,12 @@ export function DashboardPage() {
                       <div className="flex-1">
                         <p className={`text-sm font-medium ${isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {o.name}
-                          {isAuto && <span className="ml-2 text-xs font-normal text-green-700">auto (Wise)</span>}
+                          {isAuto && (
+                            <span className="ml-2 text-xs font-normal text-green-700">
+                              {notRequired ? "nereikia: nėra užsienio paslaugų" : "auto (Wise)"}
+                            </span>
+                          )}
+                          {reopened && <span className="ml-2 text-xs font-semibold text-amber-600">Pridėta naujų pirkimų — patikrinkite</span>}
                           {overdue && <span className="ml-2 text-xs font-semibold text-red-600">Vėluoja</span>}
                         </p>
                         <p className="text-xs text-gray-500">{o.description}</p>
@@ -301,6 +331,22 @@ export function DashboardPage() {
                         )}
                       </div>
                     </summary>
+                    {month?.required && (
+                      <div className="ml-4 mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+                        <p className="font-medium">Užsienio paslaugos už {month.period}:</p>
+                        <ul className="mt-1 list-disc pl-5">
+                          {month.triggers.map((t) => (
+                            <li key={t.payment.id}>
+                              {t.payment.date} · {t.payment.counterparty} · {t.payment.amount.toFixed(2)} {t.payment.currency}
+                              {t.eur !== undefined && t.payment.currency !== "EUR" ? ` (${t.eur.toFixed(2)} EUR)` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                        {month.estimatedPvm !== undefined && (
+                          <p className="mt-1">Preliminarus PVM (21 %): {fmt(month.estimatedPvm)} — patvirtinkite su VMI.</p>
+                        )}
+                      </div>
+                    )}
                     {o.steps.length > 0 && (
                       <ol className="ml-4 mt-2 mb-3 space-y-2 border-l-2 border-blue-200 pl-4">
                         {o.steps.map((step, j) => (

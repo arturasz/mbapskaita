@@ -9,6 +9,9 @@ import { asCategory, asCurrency, uploadReceipt } from "../../lib/receipt-upload"
 import type { UploadedReceipt } from "../../lib/receipt-upload";
 import { convertToEur } from "../../lib/currency";
 import type { Expense } from "../../types";
+import { useSettingsStore } from "../../stores/settings-store";
+import { guessVatKind, receiptFor } from "../../lib/pvm101";
+import type { VatKind } from "../../lib/pvm101";
 
 const otherLabels: Record<Exclude<WiseKind, "card">, string> = {
   investment: "Pervedimai į IBKR",
@@ -22,7 +25,8 @@ const money = (p: WisePayment) =>
   p.merchantCurrency ? `${p.merchantAmount!.toFixed(2)} ${p.merchantCurrency}` : `${p.amount.toFixed(2)} ${p.currency}`;
 
 export function WisePanel() {
-  const { payments, decisions, loaded, hydrate, importPayments, ignore, link, clearDecision } = useWiseStore();
+  const { payments, decisions, vatKinds, loaded, hydrate, importPayments, ignore, link, clearDecision, setVatKind } = useWiseStore();
+  const pvmFrom = useSettingsStore((s) => s.settings.pvmRegisteredFrom);
   const { expenses, loaded: expensesLoaded, hydrate: hydrateExpenses, add } = useExpenseStore();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -142,6 +146,18 @@ export function WisePanel() {
 
   const btn = "text-sm text-blue-600 hover:text-blue-800";
 
+  // Card payments since PVM registration that are not obviously Lithuanian: the user confirms the kind.
+  const foreign = pvmFrom
+    ? cards
+        .filter((p) => p.date >= pvmFrom)
+        .map((p) => {
+          const d = decisions[p.id];
+          const guess = guessVatKind(p, receiptFor(p, expenses, d?.status === "linked" ? d.expenseId : undefined));
+          return { p, kind: vatKinds[p.id] ?? guess, guess };
+        })
+        .filter((x) => x.guess !== "local" || vatKinds[x.p.id])
+    : [];
+
   return (
     <Card title="Wise išlaidos ir čekiai">
       <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
@@ -256,6 +272,32 @@ export function WisePanel() {
                 </li>
               );
             })}
+          </ul>
+        </details>
+      )}
+
+      {foreign.length > 0 && (
+        <details className="mt-4 text-sm" open>
+          <summary className="cursor-pointer font-medium text-gray-700">
+            Užsienio pirkimai nuo PVM registracijos ({foreign.length}) — nuo jų priklauso PVM101
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {foreign.map(({ p, kind }) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3">
+                <span className="w-24 text-gray-500">{p.date}</span>
+                <span className="min-w-0 flex-1 truncate">{p.counterparty}</span>
+                <span className="w-28 text-right">{money(p)}</span>
+                <select
+                  value={kind}
+                  onChange={(e) => setVatKind(p.id, e.target.value as VatKind)}
+                  className="rounded-md border border-gray-300 px-1 py-0.5 text-xs"
+                >
+                  <option value="service">Užsienio paslauga</option>
+                  <option value="goods">Prekė</option>
+                  <option value="local">Vietinis pirkimas</option>
+                </select>
+              </li>
+            ))}
           </ul>
         </details>
       )}

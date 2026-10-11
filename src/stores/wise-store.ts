@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { storage } from "../storage";
 import type { WisePayment } from "../lib/import-wise";
+import type { VatKind } from "../lib/pvm101";
 
 const STORAGE_KEY = "wise-payments";
 
@@ -12,23 +13,26 @@ export type WiseDecision =
 interface WiseStore {
   payments: WisePayment[];
   decisions: Record<string, WiseDecision>;
+  vatKinds: Record<string, VatKind>; // user overrides of the PVM kind guess
   loaded: boolean;
   hydrate: () => Promise<void>;
   importPayments: (incoming: WisePayment[]) => Promise<{ added: number; updated: number }>;
   ignore: (id: string, note: string) => Promise<void>;
   link: (id: string, expenseId: string) => Promise<void>;
   clearDecision: (id: string) => Promise<void>;
+  setVatKind: (id: string, kind: VatKind | null) => Promise<void>;
 }
 
 interface Saved {
   payments: WisePayment[];
   decisions: Record<string, WiseDecision>;
+  vatKinds?: Record<string, VatKind>;
 }
 
 export const useWiseStore = create<WiseStore>((set, get) => {
   const save = () => {
-    const { payments, decisions } = get();
-    return storage.set<Saved>(STORAGE_KEY, { payments, decisions });
+    const { payments, decisions, vatKinds } = get();
+    return storage.set<Saved>(STORAGE_KEY, { payments, decisions, vatKinds });
   };
   const decide = async (id: string, decision: WiseDecision) => {
     set({ decisions: { ...get().decisions, [id]: decision } });
@@ -38,12 +42,13 @@ export const useWiseStore = create<WiseStore>((set, get) => {
   return {
     payments: [],
     decisions: {},
+    vatKinds: {},
     loaded: false,
 
     hydrate: async () => {
       const data = await storage.get<Saved>(STORAGE_KEY);
       const decisions = data?.decisions ?? {};
-      set({ payments: data?.payments ?? [], decisions, loaded: true });
+      set({ payments: data?.payments ?? [], decisions, vatKinds: data?.vatKinds ?? {}, loaded: true });
     },
 
     // Re-importing refreshes stored rows, so new parser fields reach old imports.
@@ -66,6 +71,12 @@ export const useWiseStore = create<WiseStore>((set, get) => {
 
     ignore: (id, note) => decide(id, { status: "ignored", note }),
     link: (id, expenseId) => decide(id, { status: "linked", expenseId }),
+
+    setVatKind: async (id, kind) => {
+      const { [id]: _old, ...rest } = get().vatKinds;
+      set({ vatKinds: kind ? { ...rest, [id]: kind } : rest });
+      await save();
+    },
 
     clearDecision: async (id) => {
       const { [id]: _removed, ...rest } = get().decisions;

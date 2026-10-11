@@ -11,6 +11,7 @@ interface ObligationStore {
   toggle: (key: string, today: string) => Promise<void>;
   // Mark several at once (a lump-sum payment covers many months).
   markMany: (keys: string[], today: string) => Promise<void>;
+  setDone: (key: string, value: string | null) => Promise<void>;
 }
 
 export const useObligationStore = create<ObligationStore>((set, get) => ({
@@ -25,6 +26,13 @@ export const useObligationStore = create<ObligationStore>((set, get) => ({
   toggle: async (key, today) => {
     const { [key]: was, ...rest } = get().done;
     const done = was ? rest : { ...rest, [key]: today };
+    set({ done });
+    await storage.set(STORAGE_KEY, done);
+  },
+
+  setDone: async (key, value) => {
+    const { [key]: _old, ...rest } = get().done;
+    const done = value === null ? rest : { ...rest, [key]: value };
     set({ done });
     await storage.set(STORAGE_KEY, done);
   },
