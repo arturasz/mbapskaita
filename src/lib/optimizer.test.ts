@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateOptimizedTax, generateObligations } from "./optimizer";
+import { calculateOptimizedTax, generateObligations, pvm101Obligations } from "./optimizer";
 import { getTaxRates } from "../data/tax-rates";
 import type { Expense, Income, WithdrawalPlan } from "../types";
 
@@ -158,5 +158,19 @@ describe("generateObligations", () => {
 
   it("shows payment code 322", () => {
     expect(psd[0].steps.some((s) => s.action.includes("322"))).toBe(true);
+  });
+});
+
+describe("pvm101Obligations", () => {
+  it("is empty without a registration date", () => {
+    expect(pvm101Obligations(2026)).toEqual([]);
+  });
+
+  it("starts with the registration month and is due on the 25th of the next month", () => {
+    const o = pvm101Obligations(2026, "2026-07-16");
+    expect(o).toHaveLength(6);
+    expect(o[0].dueDate).toBe("2026-08-25");
+    expect(o[0].description).toContain("2026-07");
+    expect(o[5].dueDate).toBe("2027-01-25");
   });
 });

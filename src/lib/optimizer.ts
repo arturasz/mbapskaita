@@ -273,14 +273,45 @@ export function calculateMonthlySodraFromPlan(
 }
 
 /**
+ * PVM101 for SVS payers: due by the 25th of the month after each tax month,
+ * starting with the registration month.
+ * Source: https://www.vmi.lt/evmi/pvm-moketojo-taikancio-svs-lietuvoje-deklaracija-pvm101
+ * UNVERIFIED: one source says it is filed only when there is data to declare.
+ */
+export function pvm101Obligations(year: number, pvmRegisteredFrom?: string): Obligation[] {
+  if (!pvmRegisteredFrom) return [];
+  const out: Obligation[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const monthEnd = `${year}-${String(m).padStart(2, "0")}-${String(new Date(year, m, 0).getDate()).padStart(2, "0")}`;
+    if (monthEnd < pvmRegisteredFrom) continue;
+    const dueYear = m === 12 ? year + 1 : year;
+    const dueMonth = m === 12 ? 1 : m + 1;
+    out.push({
+      name: "PVM101 (SVS)",
+      description: `PVM deklaracija už ${year}-${String(m).padStart(2, "0")}`,
+      dueDate: `${dueYear}-${String(dueMonth).padStart(2, "0")}-25`,
+      recurring: "monthly",
+      category: "vat",
+      steps: [
+        { action: "Prisijunkite prie EDS", portal: "https://deklaravimas.vmi.lt" },
+        { action: "Pateikite PVM101 už praėjusį mėnesį (jei yra ką deklaruoti — patikrinkite su VMI 1882)", form: "PVM101" },
+      ],
+    });
+  }
+  return out;
+}
+
+/**
  * Obligations timeline with step-by-step instructions.
  */
 export function generateObligations(
   year: number,
   plan: WithdrawalPlan,
   result: OptimizedTaxResult,
+  pvmRegisteredFrom?: string,
 ): Obligation[] {
   const obligations: Obligation[] = [];
+  obligations.push(...pvm101Obligations(year, pvmRegisteredFrom));
   const hasMemberWithdrawal = plan.memberWithdrawalEnabled && result.totalVsd > 0;
 
   // Monthly Sodra for member withdrawal (code 02)

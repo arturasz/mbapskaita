@@ -106,6 +106,16 @@ export function SettingsPage() {
             </span>
           </label>
           <label className="block">
+            <span className="text-sm font-medium text-gray-700">PVM mokėtojo registracijos data</span>
+            <input
+              type="date"
+              value={settings.pvmRegisteredFrom ?? ""}
+              onChange={(e) => handleChange({ pvmRegisteredFrom: e.target.value || undefined })}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <span className="mt-1 text-xs text-gray-500">Nuo jos rodomi PVM101 priminimai (kiekvieno mėnesio 25 d.)</span>
+          </label>
+          <label className="block">
             <span className="text-sm font-medium text-gray-700">Planuojamos mėnesinės pajamos (EUR)</span>
             <input
               type="number"

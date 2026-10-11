@@ -106,8 +106,8 @@ export function DashboardPage() {
   );
 
   const obligations = useMemo(
-    () => generateObligations(year, settings.withdrawalPlan, result),
-    [year, settings.withdrawalPlan, result],
+    () => generateObligations(year, settings.withdrawalPlan, result, settings.pvmRegisteredFrom),
+    [year, settings.withdrawalPlan, result, settings.pvmRegisteredFrom],
   );
 
   const today = new Date().toISOString().slice(0, 10);

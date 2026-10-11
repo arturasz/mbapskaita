@@ -181,6 +181,7 @@ export interface Settings {
   memberName: string;
   mbName: string;
   activityStartDate?: string;
+  pvmRegisteredFrom?: string; // PVM payer registration date (SVS)
   withdrawalPlan: WithdrawalPlan;
   plannedMonthlyIncome: number; // expected monthly income in EUR (for projections)
 }
