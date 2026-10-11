@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Card } from "../../components/Card";
 import { expenseCategories } from "../../data/expense-categories";
+import { asCategory, asCurrency, uploadReceipt } from "../../lib/receipt-upload";
 import { convertToEur } from "../../lib/currency";
 import { useExpenseStore } from "../../stores/expense-store";
 import type { Currency, ExpenseCategory } from "../../types";
@@ -19,34 +20,6 @@ interface Row {
   vatAmount: string;
   vatDeductible: boolean;
 }
-
-const MAX_IMAGE_SIDE = 1800;
-
-async function toBase64(file: File): Promise<{ contentType: string; dataBase64: string }> {
-  if (file.type === "application/pdf") {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    }
-    return { contentType: file.type, dataBase64: btoa(binary) };
-  }
-  // Photos are shrunk first: phone cameras produce files larger than the upload limit.
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-  return { contentType: "image/jpeg", dataBase64: dataUrl.split(",")[1] };
-}
-
-const asCurrency = (raw: unknown): Currency =>
-  raw === "USD" || raw === "GBP" ? raw : "EUR";
-
-const asCategory = (raw: unknown): ExpenseCategory =>
-  expenseCategories.some((c) => c.key === raw) ? (raw as ExpenseCategory) : "other";
 
 export function ReceiptDrop() {
   const add = useExpenseStore((s) => s.add);
@@ -74,18 +47,7 @@ export function ReceiptDrop() {
     };
     setRows((all) => [...all, base]);
     try {
-      const payload = await toBase64(file);
-      const res = await fetch("/api/receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, ...payload }),
-      });
-      if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? `HTTP ${res.status}`);
-      const { fileId, extracted, extractError } = (await res.json()) as {
-        fileId: string;
-        extracted: Record<string, unknown> | null;
-        extractError: string | null;
-      };
+      const { fileId, extracted, extractError } = await uploadReceipt(file);
       const x = extracted ?? {};
       patch(key, {
         fileId,

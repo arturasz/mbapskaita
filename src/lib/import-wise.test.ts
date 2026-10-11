@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findReceipt, parseWiseCsv } from "./import-wise";
+import { findPaymentForReceipt, findReceipt, parseWiseCsv } from "./import-wise";
 import type { Expense } from "../types";
 
 const HEADER =
@@ -70,5 +70,27 @@ describe("card paid in the merchant's currency", () => {
       category: "equipment", vatDeductible: false, fileId: "f",
     } as Expense;
     expect(findReceipt(p, [e])).toBeDefined();
+  });
+});
+
+describe("findPaymentForReceipt", () => {
+  const [p] = parseWiseCsv(
+    [
+      HEADER,
+      '"CARD-9",16-07-2026,"16-07-2026 10:00:00.000",-155.11,USD,"Card",,100,USD,GBP,0.74,,,,"Sp Aer Uk LONDON",1234,Name,,,0.00,114.83,DEBIT,CARD',
+    ].join("\n"),
+  );
+
+  it("finds a payment by merchant currency amount and date", () => {
+    expect(findPaymentForReceipt({ date: "2026-07-15", amount: 114.83, currency: "GBP" }, [p])).toBe(p);
+  });
+
+  it("finds a payment by account currency amount", () => {
+    expect(findPaymentForReceipt({ date: "2026-07-16", amount: 155.11, currency: "USD" }, [p])).toBe(p);
+  });
+
+  it("rejects other amounts and distant dates", () => {
+    expect(findPaymentForReceipt({ date: "2026-07-16", amount: 99, currency: "GBP" }, [p])).toBeUndefined();
+    expect(findPaymentForReceipt({ date: "2026-09-01", amount: 114.83, currency: "GBP" }, [p])).toBeUndefined();
   });
 });

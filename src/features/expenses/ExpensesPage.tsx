@@ -164,8 +164,8 @@ export function ExpensesPage() {
         </div>
       )}
 
-      <ReceiptDrop />
       <WisePanel />
+      <ReceiptDrop />
 
       {showForm && (
         <Card title={editingId ? "Redaguoti išlaidą" : "Nauja išlaida"}>

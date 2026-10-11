@@ -119,3 +119,15 @@ export function findReceipt(p: WisePayment, expenses: Expense[]): Expense | unde
     return p.currency === "EUR" && Math.abs(e.amountEur - p.amount) / p.amount < 0.03;
   });
 }
+
+/** Open payment that a freshly read receipt (date, amount, currency) belongs to. */
+export function findPaymentForReceipt(
+  r: { date: string; amount: number; currency: Currency },
+  payments: WisePayment[],
+): WisePayment | undefined {
+  return payments.find((p) => {
+    if (daysApart(r.date, p.date) > 5) return false;
+    if (p.merchantCurrency === r.currency) return Math.abs(p.merchantAmount! - r.amount) < 0.015;
+    return p.currency === r.currency && Math.abs(p.amount - r.amount) < 0.015;
+  });
+}

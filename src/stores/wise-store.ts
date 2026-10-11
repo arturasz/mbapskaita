@@ -4,20 +4,20 @@ import type { WisePayment } from "../lib/import-wise";
 
 const STORAGE_KEY = "wise-payments";
 
-// Payments are re-imported from CSV at any time; only the user's decisions are stored.
-export interface WiseDecision {
-  status: "ignored";
-  note: string;
-}
+// Payments come from the CSV; the user's decisions are kept per payment id.
+export type WiseDecision =
+  | { status: "ignored"; note: string }
+  | { status: "linked"; expenseId: string };
 
 interface WiseStore {
   payments: WisePayment[];
   decisions: Record<string, WiseDecision>;
   loaded: boolean;
   hydrate: () => Promise<void>;
-  importPayments: (incoming: WisePayment[]) => Promise<{ added: number }>;
+  importPayments: (incoming: WisePayment[]) => Promise<{ added: number; updated: number }>;
   ignore: (id: string, note: string) => Promise<void>;
-  unignore: (id: string) => Promise<void>;
+  link: (id: string, expenseId: string) => Promise<void>;
+  clearDecision: (id: string) => Promise<void>;
 }
 
 interface Saved {
@@ -30,6 +30,10 @@ export const useWiseStore = create<WiseStore>((set, get) => {
     const { payments, decisions } = get();
     return storage.set<Saved>(STORAGE_KEY, { payments, decisions });
   };
+  const decide = async (id: string, decision: WiseDecision) => {
+    set({ decisions: { ...get().decisions, [id]: decision } });
+    await save();
+  };
 
   return {
     payments: [],
@@ -38,25 +42,32 @@ export const useWiseStore = create<WiseStore>((set, get) => {
 
     hydrate: async () => {
       const data = await storage.get<Saved>(STORAGE_KEY);
-      set({ payments: data?.payments ?? [], decisions: data?.decisions ?? {}, loaded: true });
+      const decisions = data?.decisions ?? {};
+      set({ payments: data?.payments ?? [], decisions, loaded: true });
     },
 
+    // Re-importing refreshes stored rows, so new parser fields reach old imports.
     importPayments: async (incoming) => {
-      const known = new Set(get().payments.map((p) => p.id));
-      const fresh = incoming.filter((p) => !known.has(p.id));
-      if (fresh.length > 0) {
-        set({ payments: [...get().payments, ...fresh].sort((a, b) => b.date.localeCompare(a.date)) });
+      const byId = new Map(get().payments.map((p) => [p.id, p]));
+      let added = 0;
+      let updated = 0;
+      for (const p of incoming) {
+        const old = byId.get(p.id);
+        if (!old) added++;
+        else if (JSON.stringify(old) !== JSON.stringify(p)) updated++;
+        byId.set(p.id, p);
+      }
+      if (added + updated > 0) {
+        set({ payments: [...byId.values()].sort((a, b) => b.date.localeCompare(a.date)) });
         await save();
       }
-      return { added: fresh.length };
+      return { added, updated };
     },
 
-    ignore: async (id, note) => {
-      set({ decisions: { ...get().decisions, [id]: { status: "ignored", note } } });
-      await save();
-    },
+    ignore: (id, note) => decide(id, { status: "ignored", note }),
+    link: (id, expenseId) => decide(id, { status: "linked", expenseId }),
 
-    unignore: async (id) => {
+    clearDecision: async (id) => {
       const { [id]: _removed, ...rest } = get().decisions;
       set({ decisions: rest });
       await save();
