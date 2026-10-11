@@ -6,7 +6,7 @@ import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useInvestmentStore } from "../../stores/investment-store";
 import type { ImportResult } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
-import { calculateInvestmentGains } from "../../lib/investments";
+import { calculateInvestmentGains, investmentTotals } from "../../lib/investments";
 import { parseIBKRActivityStatement } from "../../lib/import-ibkr";
 import { useDividendStore } from "../../stores/dividend-store";
 import { parseFlexCsv, flexDividends } from "../../lib/import-ibkr-flex";
@@ -54,6 +54,8 @@ export function InvestmentsPage() {
     () => calculateInvestmentGains(investments, year),
     [investments, year],
   );
+
+  const totals = useMemo(() => investmentTotals(investments), [investments]);
 
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -219,9 +221,13 @@ export function InvestmentsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Realizuotas pelnas" value={fmt(gains.reduce((s, g) => s + g.gain, 0))} />
+        <StatCard
+          label="Investuota (savikaina)"
+          value={fmt(totals.openCostEur)}
+          subtitle={Object.entries(totals.openCost).map(([c, v]) => `${v.toLocaleString("lt-LT", { minimumFractionDigits: 2 })} ${c}`).join(" · ") || undefined}
+        />
         <StatCard label="Realizuotas pelnas (MB pelnas)" value={fmt(gains.reduce((s, g) => s + g.gain, 0))} />
-        <StatCard label="Pozicijų" value={String(investments.length)} />
+        <StatCard label="Atvirų pozicijų" value={String(totals.openLots)} subtitle={`Iš viso įrašų: ${investments.length}`} />
       </div>
 
       {showForm && (
@@ -343,6 +349,13 @@ export function InvestmentsPage() {
             { key: "date", header: "Pirkimo data", render: (inv) => inv.purchaseDate },
             { key: "qty", header: "Kiekis", render: (inv) => String(inv.quantity) },
             {
+              key: "priceOrig",
+              header: "Kaina",
+              render: (inv) =>
+                `${inv.purchasePrice.toLocaleString("lt-LT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${inv.currency}`,
+              className: "text-right",
+            },
+            {
               key: "price",
               header: "Kaina EUR",
               render: (inv) => fmt(inv.purchasePriceEur),
@@ -353,7 +366,7 @@ export function InvestmentsPage() {
               header: "Pardavimas",
               render: (inv) =>
                 inv.saleDate
-                  ? `${inv.saleDate} — ${fmt(inv.salePriceEur ?? 0)}`
+                  ? `${inv.saleDate} — ${(inv.salePrice ?? 0).toFixed(2)} ${inv.currency} (${fmt(inv.salePriceEur ?? 0)})`
                   : "Neparduota",
             },
             {
@@ -383,6 +396,12 @@ export function InvestmentsPage() {
           ]}
         />
       </Card>
+
+      <p className="-mt-3 px-1 text-sm font-medium text-gray-700">
+        Iš viso atviros pozicijos:{" "}
+        {Object.entries(totals.openCost).map(([c, v]) => `${v.toLocaleString("lt-LT", { minimumFractionDigits: 2 })} ${c}`).join(" · ")}
+        {" "}({fmt(totals.openCostEur)})
+      </p>
 
       <Card title="Dividendai ir išskaitytas mokestis">
         <Table

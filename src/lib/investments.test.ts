@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateInvestmentGains, mbInvestmentIncome, totalInvestmentTax } from "./investments";
+import { brokerCashUsd, calculateInvestmentGains, investmentTotals, mbInvestmentIncome, totalInvestmentTax } from "./investments";
 import type { Dividend, Investment } from "../types";
 
 function makeInvestment(overrides: Partial<Investment> = {}): Investment {
@@ -107,5 +107,28 @@ describe("mbInvestmentIncome", () => {
   it("counts a loss as negative", () => {
     const r = mbInvestmentIncome([{ ...lot, salePriceEur: 80 }], [], 2026);
     expect(r.total).toBe(-10);
+  });
+});
+
+describe("investmentTotals", () => {
+  const lot = (o: Partial<Investment>) =>
+    ({ id: "x", asset: "A", purchaseDate: "2026-05-01", purchasePrice: 100, currency: "USD", purchasePriceEur: 90, quantity: 1, broker: "IBKR", ...o }) as Investment;
+
+  it("sums open lots per currency and in EUR, ignoring sold lots", () => {
+    const t = investmentTotals([lot({}), lot({ purchasePrice: 50, purchasePriceEur: 45 }), lot({ saleDate: "2026-06-01", salePriceEur: 1 })]);
+    expect(t.openCost).toEqual({ USD: 150 });
+    expect(t.openCostEur).toBe(135);
+    expect(t.openLots).toBe(2);
+  });
+});
+
+describe("brokerCashUsd", () => {
+  const lot = (o: Partial<Investment>) =>
+    ({ id: "x", asset: "A", purchaseDate: "2026-05-01", purchasePrice: 1000, currency: "USD", purchasePriceEur: 900, quantity: 1, broker: "IBKR", ...o }) as Investment;
+  const div = (amount: number) => ({ id: "d", date: "2026-06-01", symbol: "V", kind: "dividend", amount, currency: "USD", amountEur: amount, description: "" }) as Dividend;
+
+  it("is deposits minus purchases plus proceeds and dividends", () => {
+    const cash = brokerCashUsd(5000, [lot({}), lot({ saleDate: "2026-07-01", salePrice: 1200 })], [div(30), div(-4.5)]);
+    expect(cash).toBe(5000 - 2000 + 1200 + 25.5);
   });
 });

@@ -8,7 +8,7 @@ import { doneFingerprint, encodeDone, pvm101ForMonth } from "../../lib/pvm101";
 import { useWiseStore } from "../../stores/wise-store";
 import { autoDonePsd, obligationKey } from "../../lib/obligation-status";
 import { useDividendStore } from "../../stores/dividend-store";
-import { mbInvestmentIncome } from "../../lib/investments";
+import { brokerCashUsd, mbInvestmentIncome } from "../../lib/investments";
 import { useInvestmentStore } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
@@ -116,6 +116,14 @@ export function DashboardPage() {
     return { retained, invested, cash: retained - invested };
   }, [result, investments]);
 
+  // Money sent to IBKR that is not invested yet (USD), from Wise transfers.
+  const ibkrCashUsd = useMemo(() => {
+    const deposits = wisePayments
+      .filter((p) => p.kind === "investment" && p.currency === "USD")
+      .reduce((s, p) => s + p.amount, 0);
+    return deposits > 0 ? brokerCashUsd(deposits, investments, dividends) : null;
+  }, [wisePayments, investments, dividends]);
+
   const hasProjection = settings.plannedMonthlyIncome > 0 && result.totalIncome > actualIncome;
 
   const monthlySodra = useMemo(
@@ -214,9 +222,15 @@ export function DashboardPage() {
             <dd className="text-lg font-semibold">{fmt(inMb.invested)}</dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-600">Likusi grynųjų dalis</dt>
+            <dt className="text-sm text-gray-600">Likusi grynųjų dalis (Wise + neįdėta IBKR)</dt>
             <dd className="text-lg font-semibold">{fmt(inMb.cash)}</dd>
           </div>
+          {ibkrCashUsd !== null && (
+            <div className="sm:col-span-3 text-xs text-gray-500">
+              Iš to IBKR sąskaitoje neįdėtų pinigų ≈ {ibkrCashUsd.toLocaleString("lt-LT", { style: "currency", currency: "USD" })}
+              (pervesta iš Wise − pirkiniai + dividendai).
+            </div>
+          )}
           <div className="sm:col-span-3 text-xs text-gray-500">
             Į pelną įtraukta: realizuotas investicijų pelnas {fmt(investmentIncome.realizedGain)}, dividendai grynai {fmt(investmentIncome.dividends)}
           </div>

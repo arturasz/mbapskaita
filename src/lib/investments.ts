@@ -71,3 +71,37 @@ export function mbInvestmentIncome(
   );
   return { realizedGain, dividends: net, total: round2(realizedGain + net) };
 }
+
+export interface InvestmentTotals {
+  /** Cost of open (unsold) lots, per original currency. */
+  openCost: Record<string, number>;
+  openCostEur: number;
+  openLots: number;
+}
+
+export function investmentTotals(investments: Investment[]): InvestmentTotals {
+  const open = investments.filter((i) => !i.saleDate);
+  const openCost: Record<string, number> = {};
+  for (const i of open) openCost[i.currency] = round2((openCost[i.currency] ?? 0) + i.purchasePrice);
+  return {
+    openCost,
+    openCostEur: round2(open.reduce((s, i) => s + i.purchasePriceEur, 0)),
+    openLots: open.length,
+  };
+}
+
+/**
+ * Cash estimated to sit in the broker account in USD: what was sent in, minus
+ * purchases, plus sale proceeds and dividends. Only USD lots and dividends count.
+ */
+export function brokerCashUsd(
+  depositsUsd: number,
+  investments: Investment[],
+  dividends: Dividend[],
+): number {
+  const usd = investments.filter((i) => i.currency === "USD");
+  const bought = usd.reduce((s, i) => s + i.purchasePrice, 0);
+  const sold = usd.reduce((s, i) => s + (i.saleDate ? (i.salePrice ?? 0) : 0), 0);
+  const divs = dividends.filter((d) => d.currency === "USD").reduce((s, d) => s + d.amount, 0);
+  return round2(depositsUsd - bought + sold + divs);
+}
