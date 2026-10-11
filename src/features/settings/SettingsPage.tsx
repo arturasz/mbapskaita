@@ -218,6 +218,20 @@ export function SettingsPage() {
             )}
           </div>
 
+          {/* Dividends */}
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={plan.dividendsEnabled}
+              onChange={(e) => handlePlanChange({ dividendsEnabled: e.target.checked })}
+              className="rounded border-gray-300"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-700">Dividendai (visas likęs pelnas)</span>
+              <p className="text-xs text-gray-500">GPM 15%, be Sodros. Išjungta = pelnas lieka MB ir nemokamas joks GPM.</p>
+            </div>
+          </label>
+
           {/* Withdrawal target */}
           <div className="border-t pt-4">
             <label className="flex items-center gap-2">
