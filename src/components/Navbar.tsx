@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { usePrivacyStore } from "../stores/privacy-store";
 
 const links = [
   { to: "/", label: "Dashboard" },
@@ -13,6 +14,7 @@ const links = [
 ];
 
 export function Navbar() {
+  const { on, set } = usePrivacyStore();
   return (
     <nav className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8">
@@ -36,6 +38,10 @@ export function Navbar() {
             </NavLink>
           ))}
         </div>
+        <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-600">
+          <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} />
+          Privatumas
+        </label>
       </div>
     </nav>
   );

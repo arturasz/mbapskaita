@@ -1,7 +1,16 @@
 import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
 import { Navbar } from "./Navbar";
+import { usePrivacyStore } from "../stores/privacy-store";
+import { setPrivacy } from "../lib/privacy";
 
 export function Layout() {
+  const on = usePrivacyStore((s) => s.on);
+  // Apply the saved choice once the page content exists.
+  useEffect(() => {
+    setPrivacy(on);
+  }, [on]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />

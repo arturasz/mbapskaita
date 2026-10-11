@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* Privacy mode: number inputs keep real values, so blur them. */
+html[data-private] input[type="number"] {
+  filter: blur(6px);
+}

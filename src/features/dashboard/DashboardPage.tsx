@@ -3,6 +3,9 @@ import { StatCard } from "../../components/StatCard";
 import { Card } from "../../components/Card";
 import { useIncomeStore } from "../../stores/income-store";
 import { useExpenseStore } from "../../stores/expense-store";
+import { useObligationStore } from "../../stores/obligation-store";
+import { useWiseStore } from "../../stores/wise-store";
+import { autoDonePsd, obligationKey } from "../../lib/obligation-status";
 import { useDividendStore } from "../../stores/dividend-store";
 import { mbInvestmentIncome } from "../../lib/investments";
 import { useInvestmentStore } from "../../stores/investment-store";
@@ -30,6 +33,8 @@ export function DashboardPage() {
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
   const { investments, hydrate: hydrateInvestments, loaded: investmentsLoaded } = useInvestmentStore();
   const { dividends, hydrate: hydrateDividends, loaded: dividendsLoaded } = useDividendStore();
+  const { done: doneManual, loaded: doneLoaded, hydrate: hydrateDone, toggle: toggleDone } = useObligationStore();
+  const { payments: wisePayments, loaded: wiseLoaded, hydrate: hydrateWise } = useWiseStore();
   const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
   useEffect(() => {
@@ -37,8 +42,10 @@ export function DashboardPage() {
     if (!expenseLoaded) hydrateExpense();
     if (!investmentsLoaded) hydrateInvestments();
     if (!dividendsLoaded) hydrateDividends();
+    if (!doneLoaded) hydrateDone();
+    if (!wiseLoaded) hydrateWise();
     if (!settingsLoaded) hydrateSettings();
-  }, [incomeLoaded, expenseLoaded, investmentsLoaded, dividendsLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateInvestments, hydrateDividends, hydrateSettings]);
+  }, [incomeLoaded, expenseLoaded, investmentsLoaded, dividendsLoaded, doneLoaded, wiseLoaded, hydrateDone, hydrateWise, settingsLoaded, hydrateIncome, hydrateExpense, hydrateInvestments, hydrateDividends, hydrateSettings]);
 
   const [year, setYear] = useState(settings.fiscalYear);
 
@@ -121,6 +128,7 @@ export function DashboardPage() {
   );
 
   const today = new Date().toISOString().slice(0, 10);
+  const autoDone = useMemo(() => autoDonePsd(obligations, wisePayments), [obligations, wisePayments]);
 
   // Deduplicate by name+date, show all (past greyed out, upcoming normal)
   const allObligations = useMemo(() => {
@@ -249,21 +257,37 @@ export function DashboardPage() {
           ) : (
             <ul className="space-y-1 max-h-[600px] overflow-y-auto">
               {allObligations.map((o, i) => {
-                const isPast = o.dueDate < today;
+                const key = obligationKey(o);
+                const isAuto = autoDone.has(key);
+                const isDone = isAuto || key in doneManual;
+                const overdue = !isDone && o.dueDate < today;
                 return (
-                <li key={i} className={isPast ? "opacity-40" : ""}>
+                <li key={i} className={isDone ? "opacity-50" : ""}>
                   <details className="group">
-                    <summary className="flex cursor-pointer items-start justify-between rounded-md px-2 py-2 hover:bg-gray-50">
+                    <summary className="flex cursor-pointer items-start justify-between gap-3 rounded-md px-2 py-2 hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={isDone}
+                        disabled={isAuto}
+                        title={isAuto ? "Atpažinta automatiškai iš Wise išrašo" : "Pažymėti kaip atliktą"}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleDone(key, today)}
+                        className="mt-1 h-4 w-4 shrink-0"
+                      />
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${isPast ? "text-gray-400 line-through" : "text-gray-900"}`}>{o.name}</p>
+                        <p className={`text-sm font-medium ${isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                          {o.name}
+                          {isAuto && <span className="ml-2 text-xs font-normal text-green-700">auto (Wise)</span>}
+                          {overdue && <span className="ml-2 text-xs font-semibold text-red-600">Vėluoja</span>}
+                        </p>
                         <p className="text-xs text-gray-500">{o.description}</p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <span className={`text-sm ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                        <span className={`text-sm ${overdue ? "font-semibold text-red-600" : isDone ? "text-gray-400" : "text-gray-600"}`}>
                           {new Date(o.dueDate).toLocaleDateString("lt-LT")}
                         </span>
                         {o.amount != null && (
-                          <p className={`text-xs font-medium ${isPast ? "text-gray-400" : "text-gray-700"}`}>{fmt(o.amount)}</p>
+                          <p className={`text-xs font-medium ${isDone ? "text-gray-400" : "text-gray-700"}`}>{fmt(o.amount)}</p>
                         )}
                       </div>
                     </summary>
