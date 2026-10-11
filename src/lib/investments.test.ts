@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calculateInvestmentGains, totalInvestmentTax } from "./investments";
-import type { Investment } from "../types";
+import { calculateInvestmentGains, mbInvestmentIncome, totalInvestmentTax } from "./investments";
+import type { Dividend, Investment } from "../types";
 
 function makeInvestment(overrides: Partial<Investment> = {}): Investment {
   return {
@@ -88,5 +88,24 @@ describe("totalInvestmentTax", () => {
       { investmentId: "2", asset: "B", purchasePriceEur: 5000, salePriceEur: 8000, gain: 3000, taxableGain: 3000, gpmOnGain: 450, holdingPeriodDays: 200 },
     ];
     expect(totalInvestmentTax(gains)).toBe(600);
+  });
+});
+
+describe("mbInvestmentIncome", () => {
+  const lot = {
+    id: "l", asset: "X", purchaseDate: "2026-05-01", purchasePrice: 100, currency: "USD",
+    purchasePriceEur: 90, saleDate: "2026-07-01", salePrice: 150, salePriceEur: 130, quantity: 1, broker: "IBKR",
+  } as Investment;
+  const div = (date: string, amountEur: number) =>
+    ({ id: date, date, symbol: "V", kind: "dividend", amount: amountEur, currency: "EUR", amountEur, description: "" }) as Dividend;
+
+  it("adds realized gains and net dividends of the year", () => {
+    const r = mbInvestmentIncome([lot], [div("2026-06-01", 50), div("2026-06-02", -7.5), div("2025-06-01", 999)], 2026);
+    expect(r).toEqual({ realizedGain: 40, dividends: 42.5, total: 82.5 });
+  });
+
+  it("counts a loss as negative", () => {
+    const r = mbInvestmentIncome([{ ...lot, salePriceEur: 80 }], [], 2026);
+    expect(r.total).toBe(-10);
   });
 });

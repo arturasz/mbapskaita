@@ -39,6 +39,7 @@ function r2(n: number): number {
  */
 export interface OptimizerOptions {
   activityStartDate?: string;
+  investmentIncome?: number; // MB gains + net dividends, added to MB profit
 }
 
 export function calculateOptimizedTax(
@@ -58,7 +59,7 @@ export function calculateOptimizedTax(
     .filter((e) => e.date.startsWith(String(year)))
     .reduce((sum, e) => sum + e.amountEur, 0);
 
-  const mbProfit = Math.max(0, totalIncome - totalExpenses);
+  const mbProfit = Math.max(0, totalIncome + (options?.investmentIncome ?? 0) - totalExpenses);
 
   const withdrawals: WithdrawalBreakdown[] = [];
 

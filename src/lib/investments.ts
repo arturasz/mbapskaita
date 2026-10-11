@@ -1,4 +1,4 @@
-import type { Investment, InvestmentGain } from "../types";
+import type { Dividend, Investment, InvestmentGain } from "../types";
 import { getTaxRates } from "../data/tax-rates";
 
 /**
@@ -50,4 +50,24 @@ export function totalInvestmentTax(gains: InvestmentGain[]): number {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Investment income of an MB. The broker account belongs to the company, so
+ * realized gains and dividends are MB profit (taxed by pelno mokestis), not
+ * the personal 15 % capital-gains regime.
+ * UNVERIFIED: foreign withholding is treated as a reduction of the dividend.
+ */
+export function mbInvestmentIncome(
+  investments: Investment[],
+  dividends: Dividend[],
+  year: number,
+): { realizedGain: number; dividends: number; total: number } {
+  const realizedGain = round2(
+    calculateInvestmentGains(investments, year).reduce((s, g) => s + g.gain, 0),
+  );
+  const net = round2(
+    dividends.filter((d) => d.date.startsWith(String(year))).reduce((s, d) => s + d.amountEur, 0),
+  );
+  return { realizedGain, dividends: net, total: round2(realizedGain + net) };
 }

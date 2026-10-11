@@ -3,6 +3,8 @@ import { StatCard } from "../../components/StatCard";
 import { Card } from "../../components/Card";
 import { useIncomeStore } from "../../stores/income-store";
 import { useExpenseStore } from "../../stores/expense-store";
+import { useDividendStore } from "../../stores/dividend-store";
+import { mbInvestmentIncome } from "../../lib/investments";
 import { useInvestmentStore } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
@@ -27,14 +29,16 @@ export function DashboardPage() {
   const { incomes, hydrate: hydrateIncome, loaded: incomeLoaded } = useIncomeStore();
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
   const { investments, hydrate: hydrateInvestments, loaded: investmentsLoaded } = useInvestmentStore();
+  const { dividends, hydrate: hydrateDividends, loaded: dividendsLoaded } = useDividendStore();
   const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
   useEffect(() => {
     if (!incomeLoaded) hydrateIncome();
     if (!expenseLoaded) hydrateExpense();
     if (!investmentsLoaded) hydrateInvestments();
+    if (!dividendsLoaded) hydrateDividends();
     if (!settingsLoaded) hydrateSettings();
-  }, [incomeLoaded, expenseLoaded, investmentsLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateInvestments, hydrateSettings]);
+  }, [incomeLoaded, expenseLoaded, investmentsLoaded, dividendsLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateInvestments, hydrateDividends, hydrateSettings]);
 
   const [year, setYear] = useState(settings.fiscalYear);
 
@@ -73,11 +77,17 @@ export function DashboardPage() {
     return projected;
   }, [incomes, year, settings.plannedMonthlyIncome]);
 
+  const investmentIncome = useMemo(
+    () => mbInvestmentIncome(investments, dividends, year),
+    [investments, dividends, year],
+  );
+
   const result = useMemo(
     () => calculateOptimizedTax(projectedIncomes, expenses, year, settings.withdrawalPlan, {
       activityStartDate: settings.activityStartDate,
+      investmentIncome: investmentIncome.total,
     }),
-    [projectedIncomes, expenses, year, settings.withdrawalPlan, settings.activityStartDate],
+    [projectedIncomes, expenses, year, settings.withdrawalPlan, settings.activityStartDate, investmentIncome],
   );
 
   const actualIncome = useMemo(
@@ -182,6 +192,9 @@ export function DashboardPage() {
           <div>
             <dt className="text-sm text-gray-600">Likusi grynųjų dalis</dt>
             <dd className="text-lg font-semibold">{fmt(inMb.cash)}</dd>
+          </div>
+          <div className="sm:col-span-3 text-xs text-gray-500">
+            Į pelną įtraukta: realizuotas investicijų pelnas {fmt(investmentIncome.realizedGain)}, dividendai grynai {fmt(investmentIncome.dividends)}
           </div>
         </dl>
         <p className="mt-3 text-xs text-gray-500">

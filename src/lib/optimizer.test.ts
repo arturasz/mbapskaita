@@ -174,3 +174,15 @@ describe("pvm101Obligations", () => {
     expect(o[5].dueDate).toBe("2027-01-25");
   });
 });
+
+describe("investment income", () => {
+  it("adds to MB profit and is taxed by pelno mokestis, not GPM", () => {
+    const r = calculateOptimizedTax([income(100_000)], [], 2026, none, {
+      activityStartDate: "2023-01-01",
+      investmentIncome: 10_000,
+    });
+    expect(r.mbProfit).toBe(110_000);
+    expect(r.totalGpm).toBe(0);
+    expect(r.pelnoMokestis).toBeCloseTo(110_000 * rates.pelnoMokestisSmall, 2);
+  });
+});

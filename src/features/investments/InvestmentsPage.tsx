@@ -6,7 +6,7 @@ import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useInvestmentStore } from "../../stores/investment-store";
 import type { ImportResult } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
-import { calculateInvestmentGains, totalInvestmentTax } from "../../lib/investments";
+import { calculateInvestmentGains } from "../../lib/investments";
 import { parseIBKRActivityStatement } from "../../lib/import-ibkr";
 import { useDividendStore } from "../../stores/dividend-store";
 import { parseFlexCsv, flexDividends } from "../../lib/import-ibkr-flex";
@@ -54,7 +54,6 @@ export function InvestmentsPage() {
     () => calculateInvestmentGains(investments, year),
     [investments, year],
   );
-  const tax = useMemo(() => totalInvestmentTax(gains), [gains]);
 
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -221,7 +220,7 @@ export function InvestmentsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Realizuotas pelnas" value={fmt(gains.reduce((s, g) => s + g.gain, 0))} />
-        <StatCard label="GPM nuo investicijų" value={fmt(tax)} />
+        <StatCard label="Realizuotas pelnas (MB pelnas)" value={fmt(gains.reduce((s, g) => s + g.gain, 0))} />
         <StatCard label="Pozicijų" value={String(investments.length)} />
       </div>
 
