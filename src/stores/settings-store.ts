@@ -15,9 +15,9 @@ const defaultSettings: Settings = {
   withdrawalPlan: {
     civilContractEnabled: false,
     civilContractAnnual: 0,
-    memberWithdrawalEnabled: true,
+    memberWithdrawalEnabled: false,
     memberWithdrawalAnnual: 0, // 0 = auto (min pilnam stažui)
-    dividendsEnabled: true,
+    dividendsEnabled: false,
     withdrawAll: true,
     withdrawalTarget: 0,
   },

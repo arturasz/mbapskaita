@@ -3,6 +3,7 @@ import { StatCard } from "../../components/StatCard";
 import { Card } from "../../components/Card";
 import { useIncomeStore } from "../../stores/income-store";
 import { useExpenseStore } from "../../stores/expense-store";
+import { useInvestmentStore } from "../../stores/investment-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
   calculateOptimizedTax,
@@ -25,13 +26,15 @@ const availableYears = Object.keys(taxRatesByYear).map(Number);
 export function DashboardPage() {
   const { incomes, hydrate: hydrateIncome, loaded: incomeLoaded } = useIncomeStore();
   const { expenses, hydrate: hydrateExpense, loaded: expenseLoaded } = useExpenseStore();
+  const { investments, hydrate: hydrateInvestments, loaded: investmentsLoaded } = useInvestmentStore();
   const { settings, hydrate: hydrateSettings, loaded: settingsLoaded, update: updateSettings } = useSettingsStore();
 
   useEffect(() => {
     if (!incomeLoaded) hydrateIncome();
     if (!expenseLoaded) hydrateExpense();
+    if (!investmentsLoaded) hydrateInvestments();
     if (!settingsLoaded) hydrateSettings();
-  }, [incomeLoaded, expenseLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateSettings]);
+  }, [incomeLoaded, expenseLoaded, investmentsLoaded, settingsLoaded, hydrateIncome, hydrateExpense, hydrateInvestments, hydrateSettings]);
 
   const [year, setYear] = useState(settings.fiscalYear);
 
@@ -83,6 +86,17 @@ export function DashboardPage() {
       .reduce((s, i) => s + i.amountEur, 0),
     [incomes, year],
   );
+
+  // Money that stays in the MB: profit after company-level taxes and any
+  // withdrawals, split into what sits in open IBKR positions and the rest (cash).
+  const inMb = useMemo(() => {
+    const withdrawalPsd = result.withdrawals.reduce((s, w) => s + w.psd, 0);
+    const retained = result.remainingInMB - (result.totalPsd - withdrawalPsd);
+    const invested = investments
+      .filter((i) => !i.saleDate)
+      .reduce((s, i) => s + i.purchasePriceEur, 0);
+    return { retained, invested, cash: retained - invested };
+  }, [result, investments]);
 
   const hasProjection = settings.plannedMonthlyIncome > 0 && result.totalIncome > actualIncome;
 
@@ -145,7 +159,7 @@ export function DashboardPage() {
           subtitle={hasProjection ? `Prognozė: ${fmt(result.totalIncome)}` : undefined}
         />
         <StatCard label="Išlaidos" value={fmt(result.totalExpenses)} />
-        <StatCard label="Mokesčiai" value={fmt(result.totalTax)} subtitle={`Efektyvus tarifas: ${(result.effectiveRate * 100).toFixed(1)}%`} />
+        <StatCard label="Mokesčiai" value={fmt(result.totalTax)} subtitle={result.withdrawals.length === 0 ? "Pinigai neišimti: tik privalomas PSD" : `Efektyvus tarifas: ${(result.effectiveRate * 100).toFixed(1)}%`} />
         <StatCard label="Grynos pajamos" value={fmt(result.totalNet)} trend="up" />
         <StatCard
           label="Stažas"
@@ -154,6 +168,27 @@ export function DashboardPage() {
           trend={result.stazasMonths >= 12 ? "up" : "down"}
         />
       </div>
+
+      <Card title="Pinigai MB viduje">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="text-sm text-gray-600">Liko MB po mokesčių</dt>
+            <dd className="text-lg font-semibold">{fmt(inMb.retained)}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-gray-600">Investuota (IBKR, savikaina)</dt>
+            <dd className="text-lg font-semibold">{fmt(inMb.invested)}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-gray-600">Likusi grynųjų dalis</dt>
+            <dd className="text-lg font-semibold">{fmt(inMb.cash)}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-gray-500">
+          Investicijos MB vardu nėra išėmimas, todėl GPM nemokamas. GPM ir Sodra atsiranda tik išsiimant
+          pinigus (nustatymuose įjunkite išėmimo scenarijų).
+        </p>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Mokesčių suskirstymas">
