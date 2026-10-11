@@ -310,14 +310,14 @@ export function generateObligations(
     for (let m = 1; m <= 12; m++) {
       obligations.push({
         name: "PSD įmoka (privaloma)",
-        description: "Minimali PSD nuo MMA",
-        dueDate: `${year}-${String(m).padStart(2, "0")}-15`,
+        description: "Minimali PSD nuo MMA, mokama iki to mėnesio paskutinės dienos",
+        dueDate: `${year}-${String(m).padStart(2, "0")}-${String(new Date(year, m, 0).getDate()).padStart(2, "0")}`,
         amount: monthlyPsd,
         recurring: "monthly",
         category: "sodra",
         steps: [
-          { action: "Prisijunkite prie Sodra portalo", portal: "https://gyventojai.sodra.lt" },
-          { action: "Atlikite PSD mokėjimą", account: "Gavėjas: Sodra. Privaloma PSD nuo MMA." },
+          { action: "Prisijunkite prie Mano Sodra", portal: "https://www.sodra.lt/lt/paslaugos/mano-sodra" },
+          { action: "Atlikite PSD mokėjimą, įmokos kodas 322 (patvirtinta Sodra 2026-10)", account: "Gavėjas: Sodra" },
         ],
       });
     }
