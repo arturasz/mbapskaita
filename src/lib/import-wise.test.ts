@@ -55,3 +55,20 @@ describe("findReceipt", () => {
     expect(findReceipt(payment, [expense({ amount: 21 })])).toBeUndefined();
   });
 });
+
+describe("card paid in the merchant's currency", () => {
+  const csv2 = [
+    HEADER,
+    '"CARD-9",16-07-2026,"16-07-2026 10:00:00.000",-155.11,USD,"Card",,100,USD,GBP,0.74,,,,"Sp Aer Uk LONDON",1234,Name,,,0.00,114.83,DEBIT,CARD',
+  ].join("\n");
+
+  it("matches a receipt in the merchant currency", () => {
+    const [p] = parseWiseCsv(csv2);
+    expect([p.merchantAmount, p.merchantCurrency]).toEqual([114.83, "GBP"]);
+    const e = {
+      id: "e", date: "2026-07-16", description: "", amount: 114.83, currency: "GBP", amountEur: 133,
+      category: "equipment", vatDeductible: false, fileId: "f",
+    } as Expense;
+    expect(findReceipt(p, [e])).toBeDefined();
+  });
+});

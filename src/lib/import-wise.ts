@@ -9,6 +9,9 @@ export interface WisePayment {
   currency: Currency;
   counterparty: string;
   kind: WiseKind;
+  // Card paid in another currency than the account: what the merchant charged.
+  merchantAmount?: number;
+  merchantCurrency?: Currency;
 }
 
 // Minimal RFC 4180 parser: Wise quotes fields that contain commas.
@@ -70,7 +73,12 @@ export function parseWiseCsv(text: string): WisePayment[] {
     header.forEach((h, i) => (r[h] = cells[i] ?? ""));
     const amount = Number(r["Amount"]);
     if (!(amount < 0) || r["Transaction Type"] !== "DEBIT") continue;
+    const merchantAmount = Number(r["Exchange To Amount"]);
+    const merchantCurrency = r["Exchange To"] as Currency;
     out.push({
+      ...(merchantAmount > 0 && merchantCurrency
+        ? { merchantAmount, merchantCurrency }
+        : {}),
       id: r["TransferWise ID"],
       date: isoDate(r["Date"]),
       amount: Math.abs(amount),
@@ -103,6 +111,9 @@ const daysApart = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(
 export function findReceipt(p: WisePayment, expenses: Expense[]): Expense | undefined {
   return expenses.find((e) => {
     if (!e.fileId || daysApart(e.date, p.date) > 5) return false;
+    if (p.merchantCurrency && e.currency === p.merchantCurrency) {
+      return Math.abs(e.amount - p.merchantAmount!) < 0.015;
+    }
     if (e.currency === p.currency) return Math.abs(e.amount - p.amount) < 0.015;
     // Receipt in another currency than the card charge: allow a 3 % FX/fee spread on EUR value.
     return p.currency === "EUR" && Math.abs(e.amountEur - p.amount) / p.amount < 0.03;
