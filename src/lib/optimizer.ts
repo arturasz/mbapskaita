@@ -273,10 +273,12 @@ export function calculateMonthlySodraFromPlan(
 }
 
 /**
- * PVM101 for SVS payers: due by the 25th of the month after each tax month,
- * starting with the registration month.
- * Source: https://www.vmi.lt/evmi/pvm-moketojo-taikancio-svs-lietuvoje-deklaracija-pvm101
- * UNVERIFIED: one source says it is filed only when there is data to declare.
+ * PVM101 for SVS payers: due by the 25th of the month after the tax month.
+ * Filed ONLY for a month with at least one of: services bought from abroad
+ * with Lithuanian PVM to self-assess, services supplied to EU businesses,
+ * EU goods above 14 000 EUR a year, goods from non-EU persons with PVM due.
+ * Source: VMI information notice Mr-PRI-183159 (2026-09-27, EDS email).
+ * Services to EU businesses also need FR0564 by the 25th of the next month.
  */
 export function pvm101Obligations(year: number, pvmRegisteredFrom?: string): Obligation[] {
   if (!pvmRegisteredFrom) return [];
@@ -288,13 +290,14 @@ export function pvm101Obligations(year: number, pvmRegisteredFrom?: string): Obl
     const dueMonth = m === 12 ? 1 : m + 1;
     out.push({
       name: "PVM101 (SVS)",
-      description: `PVM deklaracija už ${year}-${String(m).padStart(2, "0")}`,
+      description: `PVM101 už ${year}-${String(m).padStart(2, "0")} — tik jei buvo užsienio paslaugų pirkimų (pvz. OpenRouter, reklama) ar paslaugų ES verslui`,
       dueDate: `${dueYear}-${String(dueMonth).padStart(2, "0")}-25`,
       recurring: "monthly",
       category: "vat",
       steps: [
         { action: "Prisijunkite prie EDS", portal: "https://deklaravimas.vmi.lt" },
-        { action: "Pateikite PVM101 už praėjusį mėnesį (jei yra ką deklaruoti — patikrinkite su VMI 1882)", form: "PVM101" },
+        { action: "Patikrinkite Wise: ar praėjusį mėnesį pirkote paslaugų iš užsienio (JAV/ES)? Jei ne — PVM101 teikti nereikia" },
+        { action: "Jei taip: pateikite PVM101 ir sumokėkite apskaičiuotą PVM iki 25 d.", form: "PVM101" },
       ],
     });
   }
