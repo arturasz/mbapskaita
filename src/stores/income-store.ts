@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Income } from "../types";
 import { storage } from "../storage";
+import { recalcIncomes } from "../lib/recalc-eur";
+import type { ToEur } from "../lib/import-ibkr-flex";
 
 const STORAGE_KEY = "incomes";
 
@@ -31,6 +33,7 @@ interface IncomeStore {
   importBatch: (items: Income[]) => Promise<ImportResult>;
   update: (id: string, income: Partial<Income>) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  recalcEur: (toEur: ToEur) => Promise<void>;
 }
 
 export const useIncomeStore = create<IncomeStore>((set, get) => ({
@@ -80,6 +83,12 @@ export const useIncomeStore = create<IncomeStore>((set, get) => ({
 
   remove: async (id) => {
     const incomes = get().incomes.filter((i) => i.id !== id);
+    set({ incomes });
+    await storage.set(STORAGE_KEY, incomes);
+  },
+
+  recalcEur: async (toEur) => {
+    const incomes = await recalcIncomes(get().incomes, toEur);
     set({ incomes });
     await storage.set(STORAGE_KEY, incomes);
   },

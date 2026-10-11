@@ -2,20 +2,12 @@ import type { Currency } from "../types";
 
 const cache = new Map<string, number>();
 
-// ECB publishes an XML feed with latest rates — no CORS issues, no date restriction.
-// For historical rates we try the ECB Statistical Data Warehouse API.
-// Fallback: latest rate if historical unavailable.
-
-// /api/ecb/* is proxied to ecb.europa.eu (avoids CORS): Vite in dev, Vercel rewrites in prod.
-const ECB_LATEST = "/api/ecb/stats/eurofxref/eurofxref-daily.xml";
+// /api/ecbdata/* is proxied to data-api.ecb.europa.eu (avoids CORS): Vite in dev, Vercel rewrites in prod.
+const ECB_SERIES = "/api/ecbdata/service/data/EXR/D";
 
 /**
- * Fetch exchange rate for a given currency to EUR.
- *
- * Strategy:
- * 1. Try ECB SDW API for the exact date (works for past dates)
- * 2. Fallback to ECB latest daily feed (always works, no CORS)
- * 3. Cache everything in memory
+ * ECB reference rate (1 `from` = ? EUR) for a date.
+ * Weekends and holidays have no fixing, so the last earlier fixing is used.
  */
 export async function getExchangeRate(
   from: Currency,
@@ -27,48 +19,27 @@ export async function getExchangeRate(
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
 
-  // The ECB XML feed gives EUR-based rates (e.g., 1 EUR = 1.08 USD)
-  // We need the inverse: 1 USD = ? EUR
-  let rate: number | null = null;
-
-  // Try latest ECB feed (always available, no CORS)
-  try {
-    rate = await fetchECBLatestRate(from);
-  } catch {
-    // silent
-  }
-
-  if (!rate) {
-    throw new Error(`Nepavyko gauti ${from}→EUR kurso`);
-  }
-
-  cache.set(key, rate);
-  return rate;
-}
-
-async function fetchECBLatestRate(from: Currency): Promise<number | null> {
-  // Check if we already have a cached "latest" value
-  const latestKey = `${from}:latest`;
-  const cached = cache.get(latestKey);
-  if (cached !== undefined) return cached;
-
-  const res = await fetch(ECB_LATEST);
-  if (!res.ok) return null;
-
-  const xml = await res.text();
-  // Parse: <Cube currency='USD' rate='1.0812'/> (ECB uses single quotes)
-  const regex = new RegExp(
-    `<Cube\\s+currency=['"]${from}['"]\\s+rate=['"]([\\d.]+)['"]`,
+  const start = new Date(Date.parse(date) - 10 * 86_400_000).toISOString().slice(0, 10);
+  const res = await fetch(
+    `${ECB_SERIES}.${from}.EUR.SP00.A?startPeriod=${start}&endPeriod=${date}&format=csvdata`,
   );
-  const match = xml.match(regex);
-  if (!match) return null;
+  if (!res.ok) throw new Error(`Nepavyko gauti ${from}→EUR kurso ${date}`);
 
-  // ECB rate is "1 EUR = X USD", we need "1 USD = ? EUR"
-  const ecbRate = parseFloat(match[1]);
-  if (!ecbRate || ecbRate === 0) return null;
+  const [header, ...rows] = (await res.text()).trim().split(/\r?\n/);
+  const cols = header.split(",");
+  const dateCol = cols.indexOf("TIME_PERIOD");
+  const valueCol = cols.indexOf("OBS_VALUE");
+  const last = rows
+    .map((r) => r.split(","))
+    .filter((c) => c[dateCol] <= date)
+    .sort((a, b) => a[dateCol].localeCompare(b[dateCol]))
+    .pop();
+  const ecbRate = last ? parseFloat(last[valueCol]) : 0;
+  if (!ecbRate) throw new Error(`Nepavyko gauti ${from}→EUR kurso ${date}`);
 
+  // ECB quotes "1 EUR = X foreign"; we need the inverse.
   const rate = 1 / ecbRate;
-  cache.set(latestKey, rate);
+  cache.set(key, rate);
   return rate;
 }
 

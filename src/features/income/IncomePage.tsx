@@ -50,6 +50,7 @@ function incomeToForm(income: Income): FormState {
 export function IncomePage() {
   const { incomes, loaded, hydrate, add, importBatch, update, remove } =
     useIncomeStore();
+  const recalcEur = useIncomeStore((s) => s.recalcEur);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -146,6 +147,19 @@ export function IncomePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Pajamos</h1>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={async () => {
+              try {
+                await recalcEur(convertToEur);
+                setImportStatus("EUR sumos perskaičiuotos pagal ECB kursą kiekvienai datai");
+              } catch (err) {
+                setImportStatus(`Klaida: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Perskaičiuoti EUR
+          </button>
           <FileImport label="Deel failai" onFiles={handleDeelFiles} />
           <DirectoryImport label="Deel katalogas" onFiles={handleDeelFiles} />
           <button

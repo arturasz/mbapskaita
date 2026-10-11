@@ -5,6 +5,10 @@
       "destination": "https://www.ecb.europa.eu/:path*"
     },
     {
+      "source": "/api/ecbdata/:path*",
+      "destination": "https://data-api.ecb.europa.eu/:path*"
+    },
+    {
       "source": "/api/lb/:path*",
       "destination": "https://www.lb.lt/webservices/FxRates/:path*"
     },

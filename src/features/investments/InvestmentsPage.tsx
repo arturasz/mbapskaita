@@ -32,7 +32,7 @@ const emptyForm = {
 };
 
 export function InvestmentsPage() {
-  const { investments, loaded, hydrate, add, update, importBatch, syncFlex, remove } = useInvestmentStore();
+  const { investments, loaded, hydrate, add, update, importBatch, syncFlex, remove, recalcEur } = useInvestmentStore();
   const dividendStore = useDividendStore();
   const [fetching, setFetching] = useState(false);
   const { settings, loaded: sl, hydrate: hs } = useSettingsStore();
@@ -186,6 +186,21 @@ export function InvestmentsPage() {
             className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
           >
             {fetching ? "Gaunama…" : "Gauti iš IBKR"}
+          </button>
+          <button
+            onClick={async () => {
+              setImportStatus("Perskaičiuojama pagal ECB kursus…");
+              try {
+                await recalcEur(convertToEur);
+                await dividendStore.recalcEur(convertToEur);
+                setImportStatus("EUR sumos perskaičiuotos pagal ECB kursą kiekvienai datai");
+              } catch (err) {
+                setImportStatus(`Klaida: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Perskaičiuoti EUR
           </button>
           <FileImport label="IBKR failai" onFiles={handleIBKRFiles} />
           <DirectoryImport label="IBKR katalogas" onFiles={handleIBKRFiles} />

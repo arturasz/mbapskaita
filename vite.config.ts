@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ecb/, ""),
       },
+      "/api/ecbdata": {
+        target: "https://data-api.ecb.europa.eu",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ecbdata/, ""),
+      },
       "/api/lb": {
         target: "https://www.lb.lt",
         changeOrigin: true,

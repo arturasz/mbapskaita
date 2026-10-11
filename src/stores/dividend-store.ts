@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Dividend } from "../types";
 import { storage } from "../storage";
+import { recalcDividends } from "../lib/recalc-eur";
+import type { ToEur } from "../lib/import-ibkr-flex";
 
 const STORAGE_KEY = "dividends";
 
@@ -9,6 +11,7 @@ interface DividendStore {
   loaded: boolean;
   hydrate: () => Promise<void>;
   importBatch: (items: Dividend[]) => Promise<number>;
+  recalcEur: (toEur: ToEur) => Promise<void>;
 }
 
 export const useDividendStore = create<DividendStore>((set, get) => ({
@@ -29,5 +32,11 @@ export const useDividendStore = create<DividendStore>((set, get) => ({
       await storage.set(STORAGE_KEY, dividends);
     }
     return fresh.length;
+  },
+
+  recalcEur: async (toEur) => {
+    const dividends = await recalcDividends(get().dividends, toEur);
+    set({ dividends });
+    await storage.set(STORAGE_KEY, dividends);
   },
 }));

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Investment } from "../types";
 import { storage } from "../storage";
+import { recalcInvestments } from "../lib/recalc-eur";
 import { applyFlexTrades } from "../lib/import-ibkr-flex";
 import type { FlexTrade, ToEur } from "../lib/import-ibkr-flex";
 
@@ -32,6 +33,7 @@ interface InvestmentStore {
   syncFlex: (trades: FlexTrade[], toEur: ToEur) => Promise<{ added: number; closed: number; warnings: string[] }>;
   update: (id: string, investment: Partial<Investment>) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  recalcEur: (toEur: ToEur) => Promise<void>;
 }
 
 export const useInvestmentStore = create<InvestmentStore>((set, get) => ({
@@ -90,6 +92,12 @@ export const useInvestmentStore = create<InvestmentStore>((set, get) => ({
 
   remove: async (id) => {
     const investments = get().investments.filter((inv) => inv.id !== id);
+    set({ investments });
+    await storage.set(STORAGE_KEY, investments);
+  },
+
+  recalcEur: async (toEur) => {
+    const investments = await recalcInvestments(get().investments, toEur);
     set({ investments });
     await storage.set(STORAGE_KEY, investments);
   },
