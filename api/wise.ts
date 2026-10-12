@@ -14,13 +14,18 @@ class WiseError extends Error {}
 async function wiseGet(path: string, token: string, key?: string): Promise<unknown> {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   let res = await fetch(`${BASE}${path}`, { headers });
+  let step = "unsigned";
   const ott = res.headers.get("x-2fa-approval");
   if (res.status === 403 && ott) {
     if (!key) throw new WiseError("Wise asks for SCA signing, but WISE_PRIVATE_KEY is missing");
     const signature = createSign("RSA-SHA256").update(ott).sign(key, "base64");
     res = await fetch(`${BASE}${path}`, { headers: { ...headers, "x-2fa-approval": ott, "X-Signature": signature } });
+    step = `signed, result=${res.headers.get("x-2fa-approval-result") ?? "none"}`;
   }
-  if (!res.ok) throw new WiseError(`Wise ${res.status} on ${path.split("?")[0]}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    const sca = ott ? "SCA token received" : "no SCA token in response";
+    throw new WiseError(`Wise ${res.status} on ${path.split("?")[0]} (${sca}; ${step}): ${(await res.text()).slice(0, 300)}`);
+  }
   return res.json();
 }
 
