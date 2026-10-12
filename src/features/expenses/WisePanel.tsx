@@ -3,7 +3,7 @@ import { Card } from "../../components/Card";
 import { FileImport } from "../../components/FileImport";
 import { useExpenseStore } from "../../stores/expense-store";
 import { useWiseStore } from "../../stores/wise-store";
-import { findPaymentForReceipt, findReceipt, parseWiseCsv } from "../../lib/import-wise";
+import { findPaymentForReceipt, findReceipt, parseWiseApi, parseWiseCsv } from "../../lib/import-wise";
 import type { WiseKind, WisePayment } from "../../lib/import-wise";
 import { asCategory, asCurrency, uploadReceipt } from "../../lib/receipt-upload";
 import type { UploadedReceipt } from "../../lib/receipt-upload";
@@ -71,6 +71,20 @@ export function WisePanel() {
       updated += r.updated;
     }
     say(added + updated > 0 ? `Pridėta: ${added}, atnaujinta: ${updated}` : "Nieko naujo (reikia Wise CSV, ne ZIP)");
+  };
+
+  const syncApi = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/wise?days=120");
+      if (!res.ok) throw new Error(await res.text());
+      const r = await importPayments(parseWiseApi((await res.json()).statements));
+      say(`Wise API: pridėta ${r.added}, atnaujinta ${r.updated}`);
+    } catch (e) {
+      say(`Wise API klaida: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   // The Wise row is the source of truth for date and amount, so the new expense always matches it.
@@ -161,6 +175,9 @@ export function WisePanel() {
   return (
     <Card title="Wise išlaidos ir čekiai">
       <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+        <button className={btn} disabled={busy} onClick={syncApi}>
+          {busy ? "Sinchronizuojama…" : "Sinchronizuoti su Wise"}
+        </button>
         <FileImport label="Wise CSV" accept=".csv" onFiles={handleCsv} />
         {cards.length > 0 && (
           <span className="text-gray-600">
