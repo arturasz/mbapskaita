@@ -8,6 +8,7 @@ const links = [
   { to: "/vat", label: "PVM" },
   { to: "/calculator", label: "Optimizatorius" },
   { to: "/investments", label: "Investicijos" },
+  { to: "/sync", label: "Sinchronizacija" },
   { to: "/converter", label: "Kursai" },
   { to: "/guides", label: "Gidai" },
   { to: "/settings", label: "Nustatymai" },

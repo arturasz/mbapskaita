@@ -9,6 +9,7 @@ import { CalculatorPage } from "./features/calculator/CalculatorPage";
 import { InvestmentsPage } from "./features/investments/InvestmentsPage";
 import { GuidesPage } from "./features/guides/GuidesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { SyncPage } from "./features/sync/SyncPage";
 import { ConverterPage } from "./features/converter/ConverterPage";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="calculator" element={<CalculatorPage />} />
           <Route path="investments" element={<InvestmentsPage />} />
           <Route path="guides" element={<GuidesPage />} />
+          <Route path="sync" element={<SyncPage />} />
           <Route path="converter" element={<ConverterPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

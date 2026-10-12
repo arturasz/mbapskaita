@@ -9,7 +9,7 @@ import { useSettingsStore } from "../../stores/settings-store";
 import { calculateInvestmentGains, investmentTotals } from "../../lib/investments";
 import { parseIBKRActivityStatement } from "../../lib/import-ibkr";
 import { useDividendStore } from "../../stores/dividend-store";
-import { parseFlexCsv, flexDividends } from "../../lib/import-ibkr-flex";
+import { importFlexText } from "../../lib/sync-actions";
 import { convertToEur } from "../../lib/currency";
 import { parseIBKRPDF } from "../../lib/import-ibkr-pdf";
 import type { Investment, Currency } from "../../types";
@@ -32,9 +32,8 @@ const emptyForm = {
 };
 
 export function InvestmentsPage() {
-  const { investments, loaded, hydrate, add, update, importBatch, syncFlex, remove, recalcEur } = useInvestmentStore();
+  const { investments, loaded, hydrate, add, update, importBatch, remove, recalcEur } = useInvestmentStore();
   const dividendStore = useDividendStore();
-  const [fetching, setFetching] = useState(false);
   const { settings, loaded: sl, hydrate: hs } = useSettingsStore();
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -92,25 +91,10 @@ export function InvestmentsPage() {
   };
 
   const importFlexCsv = async (csv: string) => {
-      const report = parseFlexCsv(csv);
-      const trades = await syncFlex(report.trades, convertToEur);
-      const dividends = await flexDividends(report.cash, convertToEur);
-      const newDividends = await dividendStore.importBatch(dividends);
-      const parts = [`IBKR: nauji pirkimai ${trades.added}`, `parduota ${trades.closed}`, `dividendai ${newDividends}`];
-      if (trades.warnings.length) parts.push(`įspėjimai: ${trades.warnings.join("; ")}`);
-      setImportStatus(parts.join(", "));
-  };
-
-  const fetchFromIBKR = async () => {
-    setFetching(true);
     try {
-      const res = await fetch("/api/ibkr");
-      if (!res.ok) throw new Error(await res.text());
-      await importFlexCsv(await res.text());
+      setImportStatus(`IBKR: ${await importFlexText(csv)}`);
     } catch (err) {
       setImportStatus(`IBKR klaida: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setFetching(false);
     }
   };
 
@@ -181,13 +165,6 @@ export function InvestmentsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Investicijos ({year})</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={fetchFromIBKR}
-            disabled={fetching}
-            className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
-          >
-            {fetching ? "Gaunama…" : "Gauti iš IBKR"}
-          </button>
           <button
             onClick={async () => {
               setImportStatus("Perskaičiuojama pagal ECB kursus…");

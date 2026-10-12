@@ -5,7 +5,6 @@ import { Badge } from "../../components/Badge";
 import { FileImport, DirectoryImport } from "../../components/FileImport";
 import { useIncomeStore } from "../../stores/income-store";
 import type { ImportResult } from "../../stores/income-store";
-import { InboxPanel } from "./InboxPanel";
 import { parseDeelCSV } from "../../lib/import-deel";
 import { parseDeelPDF } from "../../lib/import-deel-pdf";
 import { convertToEur } from "../../lib/currency";
@@ -176,8 +175,6 @@ export function IncomePage() {
           {importStatus}
         </div>
       )}
-
-      <InboxPanel />
 
       {showForm && (
         <Card title={editingId ? "Redaguoti pajamas" : "Naujos pajamos"}>
