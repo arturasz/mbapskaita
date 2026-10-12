@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doneFingerprint, encodeDone, guessVatKind, pvm101ForMonth } from "./pvm101";
+import { doneFingerprint, encodeDone, guessVatKind, invoiceVatNote, pvm101ForMonth } from "./pvm101";
 import type { Expense } from "../types";
 import type { WisePayment } from "./import-wise";
 
@@ -21,6 +21,32 @@ describe("guessVatKind", () => {
     const p = pay("c", "2026-07-16", "Sp Aer Uk LONDON");
     expect(guessVatKind(p)).toBe("service");
     expect(guessVatKind(p, { category: "equipment" } as Expense)).toBe("goods");
+  });
+});
+
+describe("VAT already on the invoice", () => {
+  const foreign = pay("f", "2026-10-02", "Some SaaS Dublin");
+  const withVat = { category: "software", vatAmount: 4.2 } as Expense;
+
+  it("is local, so no PVM101 self-assessment", () => {
+    expect(guessVatKind(foreign, withVat)).toBe("local");
+  });
+
+  it("stays a service when the invoice shows no VAT or the VAT is unknown", () => {
+    expect(guessVatKind(foreign, { category: "software", vatAmount: 0 } as Expense)).toBe("service");
+    expect(guessVatKind(foreign, { category: "software" } as Expense)).toBe("service");
+  });
+
+  it("drops the month out of PVM101", () => {
+    const e = { id: "e", date: "2026-10-02", amount: 20, currency: "USD", amountEur: 17, category: "software", vatAmount: 3, fileId: "f" } as Expense;
+    expect(pvm101ForMonth("2026-10", [foreign], [e], {}, {}, "2026-07-16").required).toBe(false);
+  });
+
+  it("explains the invoice VAT state", () => {
+    expect(invoiceVatNote(undefined)).toBe("nėra čekio");
+    expect(invoiceVatNote({} as Expense)).toBe("PVM sąskaitoje nežinomas");
+    expect(invoiceVatNote({ vatAmount: 0 } as Expense)).toBe("PVM sąskaitoje nėra");
+    expect(invoiceVatNote({ vatAmount: 3.71 } as Expense)).toBe("PVM sąskaitoje: 3.71");
   });
 });
 

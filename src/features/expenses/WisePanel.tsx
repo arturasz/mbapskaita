@@ -9,7 +9,7 @@ import type { UploadedReceipt } from "../../lib/receipt-upload";
 import { convertToEur } from "../../lib/currency";
 import type { Expense } from "../../types";
 import { useSettingsStore } from "../../stores/settings-store";
-import { guessVatKind, receiptFor } from "../../lib/pvm101";
+import { guessVatKind, invoiceVatNote, receiptFor } from "../../lib/pvm101";
 import type { VatKind } from "../../lib/pvm101";
 
 const otherLabels: Record<Exclude<WiseKind, "card">, string> = {
@@ -140,8 +140,9 @@ export function WisePanel() {
         .filter((p) => p.date >= pvmFrom)
         .map((p) => {
           const d = decisions[p.id];
-          const guess = guessVatKind(p, receiptFor(p, expenses, d?.status === "linked" ? d.expenseId : undefined));
-          return { p, kind: vatKinds[p.id] ?? guess, guess };
+          const receipt = receiptFor(p, expenses, d?.status === "linked" ? d.expenseId : undefined);
+          const guess = guessVatKind(p, receipt);
+          return { p, kind: vatKinds[p.id] ?? guess, guess, receipt };
         })
         .filter((x) => x.guess !== "local" || vatKinds[x.p.id])
     : [];
@@ -270,11 +271,12 @@ export function WisePanel() {
             Užsienio pirkimai nuo PVM registracijos ({foreign.length}) — nuo jų priklauso PVM101
           </summary>
           <ul className="mt-2 space-y-1">
-            {foreign.map(({ p, kind }) => (
+            {foreign.map(({ p, kind, receipt }) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3">
                 <span className="w-24 text-gray-500">{p.date}</span>
                 <span className="min-w-0 flex-1 truncate">{p.counterparty}</span>
                 <span className="w-28 text-right">{money(p)}</span>
+                <span className="w-44 text-xs text-gray-500">{invoiceVatNote(receipt)}</span>
                 <select
                   value={kind}
                   onChange={(e) => setVatKind(p.id, e.target.value as VatKind)}
@@ -282,7 +284,7 @@ export function WisePanel() {
                 >
                   <option value="service">Užsienio paslauga</option>
                   <option value="goods">Prekė</option>
-                  <option value="local">Vietinis pirkimas</option>
+                  <option value="local">Vietinis / PVM jau sąskaitoje</option>
                 </select>
               </li>
             ))}

@@ -21,9 +21,18 @@ export function receiptFor(
   return (linkedExpenseId && expenses.find((e) => e.id === linkedExpenseId)) || findReceipt(p, expenses);
 }
 
+/** Text for the receipt's VAT line: charged, none, or unknown (no receipt or not read). */
+export function invoiceVatNote(expense?: Expense): string {
+  if (!expense) return "nėra čekio";
+  if (expense.vatAmount === undefined) return "PVM sąskaitoje nežinomas";
+  return expense.vatAmount > 0 ? `PVM sąskaitoje: ${expense.vatAmount.toFixed(2)}` : "PVM sąskaitoje nėra";
+}
+
 /** Best guess; the user can override it per payment. */
 export function guessVatKind(p: WisePayment, expense?: Expense): VatKind {
   if (LT_MERCHANT.test(p.counterparty)) return "local";
+  // The supplier already charged VAT on the invoice, so there is nothing to self-assess.
+  if (expense?.vatAmount && expense.vatAmount > 0) return "local";
   if (expense && GOODS_CATEGORIES.has(expense.category)) return "goods";
   return "service";
 }
