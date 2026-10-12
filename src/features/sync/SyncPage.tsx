@@ -1,24 +1,25 @@
 import { useEffect, useState } from "react";
 import { Card } from "../../components/Card";
+import { FileImport } from "../../components/FileImport";
 import { useIncomeStore } from "../../stores/income-store";
 import { useInvestmentStore } from "../../stores/investment-store";
 import { useDividendStore } from "../../stores/dividend-store";
 import { useWiseStore } from "../../stores/wise-store";
 import { useSyncStore } from "../../stores/sync-store";
-import { fetchInbox, syncDeel, syncIbkr, syncWise } from "../../lib/sync-actions";
+import { fetchInbox, importWiseFiles, syncDeel, syncIbkr } from "../../lib/sync-actions";
 import { isStale, lastSyncLabel, SYNC_LABELS, type SyncSource } from "../../lib/sync-status";
 
-const RUNNERS: Record<SyncSource, () => Promise<string>> = {
+const RUNNERS: Partial<Record<SyncSource, () => Promise<string>>> = {
   deel: () => syncDeel(),
   ibkr: () => syncIbkr(),
-  wise: () => syncWise(),
 };
 const BUTTONS: Record<SyncSource, string> = {
   deel: "Importuoti",
   ibkr: "Gauti iš IBKR",
-  wise: "Sinchronizuoti",
+  wise: "",
 };
 const STALE_DAYS = 35;
+const WISE_STATEMENT_URL = "https://wise.com/balances/statements/balance-statement?referrer=%2Fyour-account";
 
 export function SyncPage() {
   const { times, loaded, hydrate } = useSyncStore();
@@ -43,13 +44,22 @@ export function SyncPage() {
   const run = async (source: SyncSource) => {
     setBusy(source);
     try {
-      const text = await RUNNERS[source]();
+      const text = await RUNNERS[source]!();
       setResults((r) => ({ ...r, [source]: { ok: true, text } }));
       if (source === "deel") setWaiting(0);
     } catch (e) {
       setResults((r) => ({ ...r, [source]: { ok: false, text: (e as Error).message } }));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const importWise = async (files: File[]) => {
+    try {
+      const text = await importWiseFiles(files);
+      setResults((r) => ({ ...r, wise: { ok: true, text } }));
+    } catch (e) {
+      setResults((r) => ({ ...r, wise: { ok: false, text: (e as Error).message } }));
     }
   };
 
@@ -75,13 +85,22 @@ export function SyncPage() {
                   )}
                   {res && <div className={`text-sm ${res.ok ? "text-green-700" : "text-red-600"}`}>{res.text}</div>}
                 </div>
-                <button
-                  onClick={() => run(s)}
-                  disabled={busy !== null}
-                  className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
-                >
-                  {busy === s ? "Vyksta…" : BUTTONS[s]}
-                </button>
+                {s === "wise" ? (
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <a href={WISE_STATEMENT_URL} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800">
+                      Atsisiųsti ataskaitą iš Wise
+                    </a>
+                    <FileImport label="Wise CSV" accept=".csv" onFiles={importWise} />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => run(s)}
+                    disabled={busy !== null}
+                    className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
+                  >
+                    {busy === s ? "Vyksta…" : BUTTONS[s]}
+                  </button>
+                )}
               </li>
             );
           })}

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Card } from "../../components/Card";
-import { FileImport } from "../../components/FileImport";
 import { useExpenseStore } from "../../stores/expense-store";
 import { useWiseStore } from "../../stores/wise-store";
-import { findPaymentForReceipt, findReceipt, parseWiseCsv } from "../../lib/import-wise";
+import { findPaymentForReceipt, findReceipt } from "../../lib/import-wise";
 import type { WiseKind, WisePayment } from "../../lib/import-wise";
 import { asCategory, asCurrency, uploadReceipt } from "../../lib/receipt-upload";
 import type { UploadedReceipt } from "../../lib/receipt-upload";
@@ -25,7 +24,7 @@ const money = (p: WisePayment) =>
   p.merchantCurrency ? `${p.merchantAmount!.toFixed(2)} ${p.merchantCurrency}` : `${p.amount.toFixed(2)} ${p.currency}`;
 
 export function WisePanel() {
-  const { payments, decisions, vatKinds, loaded, hydrate, importPayments, ignore, link, clearDecision, setVatKind } = useWiseStore();
+  const { payments, decisions, vatKinds, loaded, hydrate, ignore, link, clearDecision, setVatKind } = useWiseStore();
   const pvmFrom = useSettingsStore((s) => s.settings.pvmRegisteredFrom);
   const { expenses, loaded: expensesLoaded, hydrate: hydrateExpenses, add } = useExpenseStore();
   const [status, setStatus] = useState<string | null>(null);
@@ -61,17 +60,6 @@ export function WisePanel() {
   const freeReceipts = expenses.filter(
     (e) => e.fileId && !usedExpenseIds.has(e.id) && !cards.some((p) => findReceipt(p, [e])),
   );
-
-  const handleCsv = async (files: File[]) => {
-    let added = 0;
-    let updated = 0;
-    for (const file of files) {
-      const r = await importPayments(parseWiseCsv(await file.text()));
-      added += r.added;
-      updated += r.updated;
-    }
-    say(added + updated > 0 ? `Pridėta: ${added}, atnaujinta: ${updated}` : "Nieko naujo (reikia Wise CSV, ne ZIP)");
-  };
 
   // The Wise row is the source of truth for date and amount, so the new expense always matches it.
   const attach = async (p: WisePayment, up: UploadedReceipt) => {
@@ -161,7 +149,7 @@ export function WisePanel() {
   return (
     <Card title="Wise išlaidos ir čekiai">
       <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-        <FileImport label="Wise CSV" accept=".csv" onFiles={handleCsv} />
+        <span className="text-gray-500">Wise CSV įkelkite puslapyje „Sinchronizacija“.</span>
         {cards.length > 0 && (
           <span className="text-gray-600">
             Kortelės mokėjimai: {cards.length} · su čekiu {matched.length} · be čekio{" "}

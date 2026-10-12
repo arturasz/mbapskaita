@@ -3,7 +3,7 @@ export type SyncSource = "deel" | "ibkr" | "wise";
 export const SYNC_LABELS: Record<SyncSource, string> = {
   deel: "Deel sąskaitos (naršyklės priedas)",
   ibkr: "Interactive Brokers",
-  wise: "Wise",
+  wise: "Wise (CSV ataskaita)",
 };
 
 const DAY = 86_400_000;

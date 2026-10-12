@@ -21,9 +21,6 @@
     "api/ibkr.ts": {
       "maxDuration": 60
     },
-    "api/wise.ts": {
-      "maxDuration": 60
-    },
     "api/receipt.ts": {
       "maxDuration": 60
     }

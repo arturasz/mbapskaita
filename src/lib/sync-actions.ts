@@ -1,6 +1,6 @@
 import { convertToEur } from "./currency";
 import { parseFlexCsv, flexDividends } from "./import-ibkr-flex";
-import { parseWiseApi } from "./import-wise";
+import { parseWiseCsv } from "./import-wise";
 import { useDividendStore } from "../stores/dividend-store";
 import { useIncomeStore } from "../stores/income-store";
 import { useInvestmentStore } from "../stores/investment-store";
@@ -34,11 +34,17 @@ export async function syncIbkr(now = new Date()): Promise<string> {
   return message;
 }
 
-export async function syncWise(now = new Date(), days = 120): Promise<string> {
-  const { statements } = await (await getOk(`/api/wise?days=${days}`)).json();
-  const r = await useWiseStore.getState().importPayments(parseWiseApi(statements));
+/** Wise has no API for EU business accounts: the user uploads the statement CSV. */
+export async function importWiseFiles(files: File[], now = new Date()): Promise<string> {
+  let added = 0;
+  let updated = 0;
+  for (const file of files) {
+    const r = await useWiseStore.getState().importPayments(parseWiseCsv(await file.text()));
+    added += r.added;
+    updated += r.updated;
+  }
   await useSyncStore.getState().mark("wise", now.toISOString());
-  return `pridėta ${r.added}, atnaujinta ${r.updated}`;
+  return added + updated > 0 ? `pridėta ${added}, atnaujinta ${updated}` : "nieko naujo (reikia Wise CSV, ne ZIP)";
 }
 
 export interface InboxItem {

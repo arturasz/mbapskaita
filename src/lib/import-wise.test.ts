@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPaymentForReceipt, findReceipt, parseWiseApi, parseWiseCsv } from "./import-wise";
+import { findPaymentForReceipt, findReceipt, parseWiseCsv } from "./import-wise";
 import type { Expense } from "../types";
 
 const HEADER =
@@ -92,48 +92,5 @@ describe("findPaymentForReceipt", () => {
   it("rejects other amounts and distant dates", () => {
     expect(findPaymentForReceipt({ date: "2026-07-16", amount: 99, currency: "GBP" }, [p])).toBeUndefined();
     expect(findPaymentForReceipt({ date: "2026-09-01", amount: 114.83, currency: "GBP" }, [p])).toBeUndefined();
-  });
-});
-
-describe("parseWiseApi", () => {
-  const stmt = {
-    currency: "USD",
-    transactions: [
-      {
-        type: "DEBIT",
-        date: "2026-07-16T10:00:00.000Z",
-        amount: { value: -155.11, currency: "USD" },
-        details: { type: "CARD", merchant: { name: "Sp Aer Uk LONDON" } },
-        exchangeDetails: { toAmount: { value: 114.83, currency: "GBP" } },
-        referenceNumber: "CARD-9",
-      },
-      {
-        type: "DEBIT",
-        date: "2026-10-03T10:00:00.000Z",
-        amount: { value: -8074.35, currency: "USD" },
-        details: { type: "TRANSFER", recipient: { name: "Interactive Brokers Ireland Limited" } },
-        referenceNumber: "TR-1",
-      },
-      {
-        type: "CREDIT",
-        date: "2026-10-08T10:00:00.000Z",
-        amount: { value: 14750, currency: "USD" },
-        details: { type: "DEPOSIT" },
-        referenceNumber: "IN-1",
-      },
-    ],
-  };
-
-  it("keeps money out and maps fields like the CSV parser", () => {
-    const rows = parseWiseApi([stmt]);
-    expect(rows.map((r) => [r.id, r.date, r.amount, r.kind])).toEqual([
-      ["CARD-9", "2026-07-16", 155.11, "card"],
-      ["TR-1", "2026-10-03", 8074.35, "investment"],
-    ]);
-    expect([rows[0].merchantAmount, rows[0].merchantCurrency]).toEqual([114.83, "GBP"]);
-  });
-
-  it("handles a statement without transactions", () => {
-    expect(parseWiseApi([{ currency: "EUR" }])).toEqual([]);
   });
 });

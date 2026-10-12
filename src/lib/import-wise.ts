@@ -63,53 +63,6 @@ function classify(r: Record<string, string>): WiseKind {
   return "other";
 }
 
-// Statement JSON from the Wise API (type=COMPACT), one per currency balance.
-export interface WiseApiStatement {
-  currency: string;
-  transactions?: {
-    type: string;
-    date: string;
-    amount: { value: number; currency: string };
-    details?: {
-      type?: string;
-      description?: string;
-      merchant?: { name?: string };
-      recipient?: { name?: string };
-    };
-    exchangeDetails?: { toAmount?: { value: number; currency: string }; forAmount?: { value: number; currency: string } };
-    referenceNumber: string;
-  }[];
-}
-
-/** Money-out rows of API statements; same output as parseWiseCsv. */
-export function parseWiseApi(statements: WiseApiStatement[]): WisePayment[] {
-  const out: WisePayment[] = [];
-  for (const s of statements) {
-    for (const t of s.transactions ?? []) {
-      if (t.type !== "DEBIT" || !(t.amount.value < 0)) continue;
-      const d = t.details ?? {};
-      const merchant = d.merchant?.name ?? "";
-      const payee = d.recipient?.name ?? "";
-      const fx = t.exchangeDetails?.toAmount ?? t.exchangeDetails?.forAmount;
-      out.push({
-        ...(fx && fx.value > 0 ? { merchantAmount: fx.value, merchantCurrency: fx.currency as Currency } : {}),
-        id: t.referenceNumber,
-        date: t.date.slice(0, 10),
-        amount: Math.abs(t.amount.value),
-        currency: t.amount.currency as Currency,
-        counterparty: merchant || payee || d.description || "",
-        kind: classify({
-          "Merchant": merchant,
-          "Payee Name": payee,
-          "Description": d.description ?? "",
-          "Transaction Details Type": d.type ?? "",
-        }),
-      });
-    }
-  }
-  return foldCardFees(out);
-}
-
 /** Money-out rows of a Wise statement CSV (one file per currency account). */
 export function parseWiseCsv(text: string): WisePayment[] {
   const [header, ...body] = parseRows(text);
