@@ -10,6 +10,7 @@ import { ReceiptDrop } from "./ReceiptDrop";
 import { WisePanel } from "./WisePanel";
 import { expenseCategories } from "../../data/expense-categories";
 import { convertToEur } from "../../lib/currency";
+import { uploadReceipt } from "../../lib/receipt-upload";
 import type { Expense, Currency, ExpenseCategory } from "../../types";
 
 const emptyForm = {
@@ -44,6 +45,9 @@ export function ExpensesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
+  const [replacement, setReplacement] = useState<{ fileId: string; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loaded) hydrate();
@@ -103,6 +107,22 @@ export function ExpensesPage() {
     setForm(emptyForm);
     setEditingId(null);
     setShowForm(false);
+    setReplacement(null);
+    setUploadError(null);
+  };
+
+  const handleReplaceFile = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const { fileId } = await uploadReceipt(file);
+      setReplacement({ fileId, name: file.name });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -127,7 +147,7 @@ export function ExpensesPage() {
     };
 
     if (editingId) {
-      await update(editingId, data);
+      await update(editingId, replacement ? { ...data, fileId: replacement.fileId } : data);
     } else {
       await add({ id: crypto.randomUUID(), ...data });
     }
@@ -302,9 +322,33 @@ export function ExpensesPage() {
                 <span className="text-xs text-gray-400">(skaičiuojama automatiškai nuo sumos su PVM)</span>
               </p>
             )}
+            {editingId && (
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Pakeisti failą (sąskaitą ar čekį)
+                </span>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => {
+                    handleReplaceFile(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                  className="mt-1 block w-full text-sm"
+                />
+                {uploading && <span className="text-xs text-blue-500">Keliama…</span>}
+                {replacement && (
+                  <span className="text-xs text-green-700">
+                    Naujas failas: {replacement.name}. Paspauskite „Atnaujinti“, kad išsaugotumėte.
+                  </span>
+                )}
+                {uploadError && <span className="text-xs text-red-600">{uploadError}</span>}
+              </label>
+            )}
             <div className="flex items-end gap-3 sm:col-span-2">
               <button
                 type="submit"
+                disabled={uploading}
                 className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
                 {editingId ? "Atnaujinti" : "Išsaugoti"}
